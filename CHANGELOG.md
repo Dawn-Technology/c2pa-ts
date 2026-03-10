@@ -1,5 +1,11 @@
 # c2pa-ts
 
+## 0.15.0
+
+### Minor Changes
+
+- Add asset utility method to create an Asset instance based on a given File
+
 ## 0.13.2
 
 ### Patch Changes
