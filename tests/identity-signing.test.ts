@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { afterAll, describe, it } from 'bun:test';
@@ -56,8 +60,8 @@ describe('Identity Assertion Signing Tests', function () {
                     [
                         {
                             url: `self#jumbf=c2pa.assertions/c2pa.hash.data`,
-                            alg: 'sha256',
-                            hash: new Uint8Array(32).fill(0), // Placeholder
+                            alg: 'SHA-256',
+                            hash: new Uint8Array(32).fill(0), //new Uint8Array([ 86, 223, 145, 128, 77, 182, 43, 147, 97, 1, 171, 0, 65, 143, 91, 140, 253, 192, 120, 131, 101, 185, 56, 87, 70, 245, 27, 148, 6, 135, 224, 248 ])
                         },
                     ],
                     'cawg.x509.cose',
@@ -73,30 +77,26 @@ describe('Identity Assertion Signing Tests', function () {
 
                 // Update the hard binding with the asset
                 await dataHashAssertion.updateWithAsset(asset);
-                
 
-                // Now update the identity assertion with the actual hash of the data hash assertion
-                // const dataHashAssertionBox = dataHashAssertion.generateJUMBFBox(manifest.claim);
-                // const dataHashAssertionBytes = dataHashAssertionBox.toBuffer(false);
-                // const dataHashAssertionHash = await Crypto.digest(dataHashAssertionBytes, 'SHA-256');
+                // Data hash assertion should have a hash after updateWithAsset
+                assert(dataHashAssertion.hash, 'Data hash assertion should have a hash after updateWithAsset');
 
-                // assert(dataHashAssertion.hash, 'Data hash assertion should have a hash after updateWithAsset');
-                
                 // Update the identity assertion with the correct hash
-                // identityAssertion.setSignerPayload(
-                //     [
-                //         {
-                //             url: `self#jumbf=c2pa.assertions/c2pa.hash.data`,
-                //             alg: 'sha256',
-                //             hash: new Uint8Array(32).fill(0), // Placeholder
-                //         },
-                //     ],
-                //     'cawg.x509.cose',
-                // );
+                identityAssertion.setSignerPayload(
+                    [
+                        {
+                            url: `self#jumbf=c2pa.assertions/c2pa.hash.data`,
+                            alg: 'SHA-256',
+                            hash: dataHashAssertion.hash,
+                        },
+                    ],
+                    'cawg.x509.cose',
+                    ['cawg.creator'],
+                );
 
                 // Set signature and padding (in real implementation, this would be a proper COSE signature)
                 // For testing purposes, we'll use placeholder values
-                identityAssertion.setSignature(new Uint8Array(64).fill(0xaa), new Uint8Array(256).fill(0x00));
+                // identityAssertion.setSignature(new Uint8Array(64).fill(0xab), new Uint8Array(256).fill(0x01));
 
                 // Create the manifest signature
                 await manifest.sign(signer, timestampProvider);
@@ -164,7 +164,7 @@ describe('Identity Assertion Signing Tests', function () {
 
     afterAll(async function () {
         // Delete test file, ignore the case it doesn't exist
-        // await fs.unlink(targetFile).catch(() => undefined);
+        await fs.unlink(targetFile).catch(() => undefined);
     });
 });
 

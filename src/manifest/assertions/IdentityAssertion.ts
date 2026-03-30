@@ -164,7 +164,7 @@ export class IdentityAssertion extends Assertion {
                 'Identity assertion is missing source box reference',
             );
         }
-        result.merge(await validateIdentityAssertion(this, this.label, this.sourceBox));
+        result.merge(await validateIdentityAssertion(manifest, this, this.label, this.sourceBox));
         return result;
     }
 

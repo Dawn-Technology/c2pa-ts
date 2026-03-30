@@ -12,13 +12,14 @@
 
 import { Crypto, HashAlgorithm } from '../crypto';
 import * as JUMBF from '../jumbf';
-import { ValidationResult, ValidationStatusCode } from '../manifest';
+import { Assertion, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
+import { HashAssertion } from '../manifest/assertions/HashAssertion';
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
 import type { HashedUriMap, HashMap, IdentityAssertionValidationOptions, SignerPayloadMap } from './types.js';
 import {
     extractAssertionLabel,
     findDuplicateReferences,
-    hashedUriMapsEqual,
+    hashMapsEqual,
     isHardBindingAssertion,
     serializeSignerPayload,
     validatePadding,
@@ -29,6 +30,7 @@ import {
  *
  * Performs comprehensive validation according to CAWG specification Section 7
  *
+ * @param manifest - The manifest containing the assertion
  * @param assertion - Identity assertion to validate
  * @param assertionLabel - Label of the identity assertion
  * @param claimData - The C2PA claim containing this assertion
@@ -36,6 +38,7 @@ import {
  * @returns Validation result with status codes
  */
 export async function validateIdentityAssertion(
+    manifest: Manifest,
     assertion: IdentityAssertion,
     assertionLabel: string,
     sourceBox: JUMBF.SuperBox,
@@ -89,10 +92,10 @@ export async function validateIdentityAssertion(
     }
 
     // Step 6: Verify referenced assertions exist in claim
-    result.merge(await validateReferencedAssertions(payload.referenced_assertions, sourceBox));
+    result.merge(await validateReferencedAssertions(payload.referenced_assertions, manifest, sourceBox));
 
     // Step 7: Verify hard binding assertion is included and correct
-    result.merge(await validateHardBindingReference(payload.referenced_assertions, sourceBox));
+    result.merge(await validateHardBindingReference(payload.referenced_assertions, manifest, sourceBox));
 
     // Step 8: Validate expected_partial_claim if present
     if (payload.expected_partial_claim) {
@@ -124,15 +127,13 @@ export async function validateIdentityAssertion(
  */
 async function validateReferencedAssertions(
     references: HashedUriMap[],
+    manifest: Manifest,
     sourceBox: JUMBF.SuperBox,
 ): Promise<ValidationResult> {
     const result = new ValidationResult();
 
-    // Get assertions from claim and ingredient manifests
-    const availableAssertions = collectAllAssertions(sourceBox);
-
     for (const ref of references) {
-        const found = availableAssertions.some(assertion => hashedUriMapsEqual(ref, assertion));
+        const found = manifest.assertions?.getAssertionsByLabel(ref.url);
 
         if (!found) {
             result.addError(
@@ -150,6 +151,7 @@ async function validateReferencedAssertions(
  */
 async function validateHardBindingReference(
     references: HashedUriMap[],
+    manifest: Manifest,
     sourceBox: JUMBF.SuperBox,
 ): Promise<ValidationResult> {
     const result = new ValidationResult();
@@ -171,9 +173,9 @@ async function validateHardBindingReference(
     // Verify it's the correct hard binding for this manifest
     // The correct one is determined by the algorithm described in
     // C2PA spec Section 15.12
-    const expectedHardBinding = determineExpectedHardBinding(sourceBox);
+    const expectedHardBindings = manifest.assertions?.getHardBindings();
 
-    if (!expectedHardBinding) {
+    if (!expectedHardBindings || expectedHardBindings.length === 0) {
         // No hard binding found in claim
         result.addError(
             ValidationStatusCode.IdentityHardBindingMissing,
@@ -182,9 +184,21 @@ async function validateHardBindingReference(
         );
         return result;
     }
-
-    const correctRef = hardBindingRefs.find(ref => hashedUriMapsEqual(ref, expectedHardBinding));
-
+    const correctRef = hardBindingRefs.find(ref => {
+        const expectedHardBinding = expectedHardBindings.find(
+            binding => binding.label === extractAssertionLabel(ref.url),
+        ) as Assertion & HashAssertion;
+        return (
+            expectedHardBinding &&
+            hashMapsEqual(
+                { hash: ref.hash, alg: ref.alg ?? '' },
+                {
+                    hash: expectedHardBinding.hash!,
+                    alg: expectedHardBinding.algorithm!,
+                },
+            )
+        );
+    });
     if (!correctRef) {
         result.addError(
             ValidationStatusCode.IdentityHardBindingIncorrect,
@@ -337,45 +351,6 @@ async function validateExpectedCountersigners(
         );
     }
     return result;
-}
-
-/**
- * Helper: Collect all assertions from claim and ingredients
- */
-function collectAllAssertions(claimData: any): HashedUriMap[] {
-    const assertions: HashedUriMap[] = [];
-
-    // Add from current claim
-    if (claimData.assertions) {
-        assertions.push(...claimData.assertions);
-    }
-    if (claimData.created_assertions) {
-        assertions.push(...claimData.created_assertions);
-    }
-    if (claimData.gathered_assertions) {
-        assertions.push(...claimData.gathered_assertions);
-    }
-
-    // Recursively add from ingredient manifests
-    // Implementation would traverse ingredient references
-
-    return assertions;
-}
-
-/**
- * Helper: Determine expected hard binding assertion
- */
-function determineExpectedHardBinding(claimData: any): HashedUriMap | null {
-    // Implementation follows C2PA spec Section 15.12
-    // This is a simplified version
-    const assertions = collectAllAssertions(claimData);
-
-    return (
-        assertions.find(a => {
-            const label = extractAssertionLabel(a.url);
-            return label && isHardBindingAssertion(label);
-        }) ?? null
-    );
 }
 
 /**
