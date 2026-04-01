@@ -224,10 +224,10 @@ export async function validateIcaCredential(
         }
 
         // Step 3: Parse verifiable credential
-        const credentialJson = new TextDecoder().decode(coseSign1.payload);
         let credential: IdentityClaimsAggregationCredential;
 
         try {
+            const credentialJson = new TextDecoder().decode(coseSign1.payload);
             credential = JSON.parse(credentialJson);
         } catch {
             result.addError(
@@ -335,6 +335,8 @@ export async function validateIcaCredential(
             );
         }
     } catch (error) {
+        console.error('Error during ICA credential validation:');
+        console.error(error);
         result.addError(
             ValidationStatusCode.IcaInvalidVerifiableCredential,
             assertionLabel,
