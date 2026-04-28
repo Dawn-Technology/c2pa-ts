@@ -360,6 +360,7 @@ export interface DecodedCoseSign1 {
         [key: string]: unknown;
     };
     unprotectedHeader: Record<number | string, unknown>;
+    protectedHeaderBytes: Uint8Array;
     payload: Uint8Array | null;
     signature: Uint8Array;
 }

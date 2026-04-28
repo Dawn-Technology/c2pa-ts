@@ -8,15 +8,24 @@
 import { Crypto, HashAlgorithm } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
+import { HashAssertion } from '../manifest/assertions/HashAssertion';
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
-import type {
-    ExpectedCountersignerMap,
-    HashedUriMap,
-    HashMap,
-    IdentityAssertionValidationOptions,
-    SignerPayloadMap,
+import {
+    SignatureType,
+    type ExpectedCountersignerMap,
+    type HashedUriMap,
+    type HashMap,
+    type IdentityAssertionValidationOptions,
+    type SignerPayloadMap,
 } from './types.js';
-import { extractAssertionLabel, findDuplicateReferences, serializeClaimData, validatePadding } from './utils.js';
+import {
+    extractAssertionLabel,
+    findDuplicateReferences,
+    hashMapsEqual,
+    isHardBindingAssertion,
+    serializeClaimData,
+    validatePadding,
+} from './utils.js';
 
 /**
  * Validate an identity assertion
@@ -69,8 +78,12 @@ export async function validateIdentityAssertion(
         return result;
     }
 
-    if (!payload.sig_type) {
-        result.addError(ValidationStatusCode.IdentitySigTypeUnknown, sourceBox, 'signer_payload missing sig_type');
+    if (!payload.sig_type || !Object.values(SignatureType).includes(payload.sig_type as SignatureType)) {
+        result.addError(
+            ValidationStatusCode.IdentitySigTypeUnknown,
+            sourceBox,
+            'signer_payload missing or unknown sig_type',
+        );
         return result;
     }
 
@@ -128,7 +141,7 @@ async function validateReferencedAssertions(
     for (const ref of references) {
         const found = manifest.assertions?.getAssertionsByLabel(ref.url);
 
-        if (!found) {
+        if (!found || found.length === 0) {
             result.addError(
                 ValidationStatusCode.IdentityAssertionMismatch,
                 sourceBox,
@@ -149,61 +162,60 @@ async function validateHardBindingReference(
 ): Promise<ValidationResult> {
     const result = new ValidationResult();
 
-    // TODO
+    // Find hard binding assertions in references
+    const hardBindingRefs = references.filter(ref => {
+        const label = extractAssertionLabel(ref.url);
+        return label && isHardBindingAssertion(label);
+    });
+
+    if (hardBindingRefs.length === 0) {
+        result.addError(
+            ValidationStatusCode.IdentityHardBindingMissing,
+            sourceBox,
+            'No hard binding assertion referenced',
+        );
+    }
+
+    // Verify it's the correct hard binding for this manifest
+    // The correct one is determined by the algorithm described in
+    // C2PA spec Section 15.12
+    const expectedHardBindings = manifest.assertions?.getHardBindings();
+
+    if (!expectedHardBindings || expectedHardBindings.length === 0) {
+        // No hard binding found in claim
+        result.addError(
+            ValidationStatusCode.IdentityHardBindingMissing,
+            sourceBox,
+            'No hard binding assertion found in claim',
+        );
+        return result;
+    }
+    const correctRef = hardBindingRefs.find(ref => {
+        const expectedHardBinding = expectedHardBindings.find(
+            binding => binding.label === extractAssertionLabel(ref.url),
+        ) as Assertion & HashAssertion;
+        return (
+            expectedHardBinding &&
+            hashMapsEqual(
+                { hash: ref.hash, alg: ref.alg ?? '' },
+                {
+                    hash: expectedHardBinding.hash!,
+                    alg: expectedHardBinding.algorithm!,
+                },
+            )
+        );
+    });
+
+    if (!correctRef) {
+        // TODO: Implement correct hard binding reference validation once we have a way to determine the correct hard binding assertion for the manifest
+        //     result.addError(
+        //         ValidationStatusCode.IdentityHardBindingIncorrect,
+        //         sourceBox,
+        //         'Hard binding reference does not match the active manifest binding',
+        //     );
+    }
+
     return result;
-
-    // // Find hard binding assertions in references
-    // const hardBindingRefs = references.filter(ref => {
-    //     const label = extractAssertionLabel(ref.url);
-    //     return label && isHardBindingAssertion(label);
-    // });
-
-    // if (hardBindingRefs.length === 0) {
-    //     result.addError(
-    //         ValidationStatusCode.IdentityHardBindingMissing,
-    //         sourceBox,
-    //         'No hard binding assertion referenced',
-    //     );
-    // }
-
-    // // Verify it's the correct hard binding for this manifest
-    // // The correct one is determined by the algorithm described in
-    // // C2PA spec Section 15.12
-    // const expectedHardBindings = manifest.assertions?.getHardBindings();
-
-    // if (!expectedHardBindings || expectedHardBindings.length === 0) {
-    //     // No hard binding found in claim
-    //     result.addError(
-    //         ValidationStatusCode.IdentityHardBindingMissing,
-    //         sourceBox,
-    //         'No hard binding assertion found in claim',
-    //     );
-    //     return result;
-    // }
-    // const correctRef = hardBindingRefs.find(ref => {
-    //     const expectedHardBinding = expectedHardBindings.find(
-    //         binding => binding.label === extractAssertionLabel(ref.url),
-    //     ) as Assertion & HashAssertion;
-    //     return (
-    //         expectedHardBinding &&
-    //         hashMapsEqual(
-    //             { hash: ref.hash, alg: ref.alg ?? '' },
-    //             {
-    //                 hash: expectedHardBinding.hash!,
-    //                 alg: expectedHardBinding.algorithm!,
-    //             },
-    //         )
-    //     );
-    // });
-    // if (!correctRef) {
-    //     result.addError(
-    //         ValidationStatusCode.IdentityHardBindingIncorrect,
-    //         sourceBox,
-    //         'Hard binding reference does not match the active manifest binding',
-    //     );
-    // }
-
-    // return result;
 }
 
 /**

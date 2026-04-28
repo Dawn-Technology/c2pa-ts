@@ -1,4 +1,5 @@
 import { Asset } from '../asset';
+import { IdentityAssertionValidationOptions } from '../cawg';
 import { Signer } from '../cose';
 import { HashAlgorithm } from '../crypto';
 import * as JUMBF from '../jumbf';
@@ -130,11 +131,13 @@ export class ManifestStore {
     /**
      * Validates the active manifest
      * @param asset Asset for validation of bindings
+     * // TODO: Consider moving the options to a service instead of passing through the manifest store and manifest layers
+     * @param options Validation options for identity assertions
      */
-    public async validate(asset: Asset): Promise<ValidationResult> {
+    public async validate(asset: Asset, options?: IdentityAssertionValidationOptions): Promise<ValidationResult> {
         const activeManifest = this.getActiveManifest();
         if (activeManifest) {
-            return activeManifest.validate(asset);
+            return activeManifest.validate(asset, options);
         } else {
             return ValidationResult.error(ValidationStatusCode.ClaimCBORInvalid, this.sourceBox);
         }

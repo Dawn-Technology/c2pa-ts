@@ -137,7 +137,10 @@ export class AssertionStore implements ManifestComponent {
      * @returns Array of assertions matching the label
      */
     public getAssertionsByLabel(label: string) {
-        return this.assertions.filter(assertion => assertion.label === label);
+        // TODO: Consider normalizing labels to not include the 'self#jumbf=c2pa.assertions/' prefix in the future to simplify this lookup, but for now support both formats for compatibility with existing manifests
+        return this.assertions.filter(
+            assertion => assertion.label === label || 'self#jumbf=c2pa.assertions/' + assertion.label === label,
+        );
     }
 
     /**

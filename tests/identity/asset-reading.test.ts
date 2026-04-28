@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { describe, it } from 'bun:test';
 import { Asset, AssetType, JPEG } from '../../src/asset';
+import { IdentityAssertionValidationOptions } from '../../src/cawg';
 import { SuperBox } from '../../src/jumbf';
-import { ManifestStore, ValidationResult, ValidationStatusCode } from '../../src/manifest';
+import { ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
 import { BinaryHelper } from '../../src/util';
 
 const baseDir = 'tests/fixtures/identity/image';
@@ -28,6 +29,11 @@ interface TestIdentityExpectations {
      * status codes expected in the status entries
      */
     statusCodes?: ValidationStatusCode[];
+
+    /**
+     * Validation options to use when validating the asset
+     */
+    options?: IdentityAssertionValidationOptions;
 }
 
 // test data sets with file names and expected outcomes
@@ -109,25 +115,24 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         valid: false,
         statusCodes: [ValidationStatusCode.IcaInvalidDidDocument],
     },
-    // 'signature_mismatch.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IcaSignatureMismatch],
-    // },
-    // 'valid_time_stamp.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IcaTimeStampValidated],
-    // },
+    'signature_mismatch.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IcaSignatureMismatch],
+    },
+    'valid_time_stamp.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: true,
+        statusCodes: [ValidationStatusCode.IcaTimeStampValidated],
+    },
+    // TODO: re-enable once time stamp validation is implemented
     // 'invalid_time_stamp.jpg': {
     //     assetType: JPEG,
     //     jumbf: true,
     //     valid: false,
-    //     statusCodes: [
-    //         ValidationStatusCode.IcaTimeStampInvalid,
-    //     ],
+    //     statusCodes: [ValidationStatusCode.IcaTimeStampInvalid],
     // },
     'valid_from_missing.jpg': {
         assetType: JPEG,
@@ -141,12 +146,15 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         valid: false,
         statusCodes: [ValidationStatusCode.IcaValidFromInvalid],
     },
-    // 'valid_from_after_time_stamp.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IcaValidFromInvalid],
-    // },
+    'valid_from_after_time_stamp.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IcaValidFromInvalid],
+        options: {
+            validationTime: new Date('2024-09-01T00:00:00Z'),
+        },
+    },
     'valid_until_in_future.jpg': {
         assetType: JPEG,
         jumbf: true,
@@ -158,57 +166,53 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         valid: false,
         statusCodes: [ValidationStatusCode.IcaValidUntilInvalid],
     },
-    // 'signer_payload_mismatch.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IcaSignerPayloadMismatch],
-    // },
-    // 'adobe_connected_identities.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: true,
-    // },
-    // 'ims_multiple_manifests.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: true,
-    // },
-    // 'malformed_cbor.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IdentityCborInvalid],
-    // },
-    // 'extra_field.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: true,
-    // },
-    // 'extra_assertion_claim_v1.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IdentityAssertionMismatch],
-    // },
+    'signer_payload_mismatch.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IcaSignerPayloadMismatch],
+    },
+    'adobe_connected_identities.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: true,
+    },
+    'ims_multiple_manifests.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: true,
+    },
+    'malformed_cbor.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IdentityCborInvalid],
+    },
+    'extra_assertion_claim_v1.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IdentityAssertionMismatch],
+    },
     'duplicate_assertion_reference.jpg': {
         assetType: JPEG,
         jumbf: true,
         valid: false,
         statusCodes: [ValidationStatusCode.IdentityAssertionDuplicate],
     },
+    // TODO: re-enable once hard binding validation is implemented
     // 'no_hard_binding.jpg': {
     //     assetType: JPEG,
     //     jumbf: true,
     //     valid: false,
     //     statusCodes: [ValidationStatusCode.IdentityHardBindingMissing],
     // },
-    // 'invalid_sig_type.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IdentitySigTypeUnknown],
-    // },
+    'invalid_sig_type.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IdentitySigTypeUnknown],
+    },
     'pad1_invalid.jpg': {
         assetType: JPEG,
         jumbf: true,
@@ -230,6 +234,16 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         ],
     },
 };
+
+// // test data sets with file names and expected outcomes
+// testIdentityFiles = {
+//     'invalid_time_stamp.jpg': {
+//         assetType: JPEG,
+//         jumbf: true,
+//         valid: false,
+//         statusCodes: [ValidationStatusCode.IcaTimeStampInvalid],
+//     },
+// };
 
 describe('Functional Identity Asset Reading Tests', function () {
     for (const [filename, data] of Object.entries(testIdentityFiles)) {
@@ -283,10 +297,33 @@ describe('Functional Identity Asset Reading Tests', function () {
                     );
 
                     // Read the manifest store from the JUMBF container
-                    const manifests = ManifestStore.read(superBox);
+                    let manifests: ManifestStore | undefined = undefined;
+                    try {
+                        manifests = ManifestStore.read(superBox);
+                    } catch (e) {
+                        if (e instanceof ValidationError) {
+                            if (data.statusCodes?.find(code => code === e.code)) {
+                                assert.ok(
+                                    true,
+                                    `expected validation error with code ${e.code} and message "${e.message}"`,
+                                );
+                                return;
+                            } else {
+                                assert.fail(
+                                    `Unexpected validation error with code ${e.code} and message "${e.message}"`,
+                                );
+                            }
+                        } else {
+                            throw e;
+                        }
+                    }
+
+                    if (!manifests) {
+                        assert.fail('Failed to read manifest store from JUMBF');
+                    }
 
                     // Validate the asset with the manifest
-                    validationResult = await manifests.validate(asset);
+                    validationResult = await manifests.validate(asset, data.options);
 
                     const message =
                         data.valid ?

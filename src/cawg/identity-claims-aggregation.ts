@@ -5,7 +5,18 @@
  * @module cawg/identity-claims-aggregation
  */
 
+import * as asn1js from 'asn1js';
 import { DIDDocument, VerificationMethod } from 'did-resolver';
+import * as pkijs from 'pkijs';
+import { Algorithms, CoseAlgorithmIdentifier } from '../cose';
+import { SigStructure } from '../cose/SigStructure';
+import { Crypto } from '../crypto';
+import type {
+    ECDSASigningAlgorithm,
+    Ed25519SigningAlgorithm,
+    RSASigningAlgorithm,
+    SigningAlgorithm,
+} from '../crypto/types';
 import * as JUMBF from '../jumbf';
 import { ValidationResult, ValidationStatusCode } from '../manifest';
 import { didResolver } from './did-resolver';
@@ -15,6 +26,7 @@ import type {
     DecodedCoseSign1,
     DecodedCoseSign1Typing,
     DIDPublicKey,
+    IdentityAssertionValidationOptions,
     IdentityClaimsAggregationCredential,
     IdentityClaimsCredentialSubject,
     ProtectedHeaderMap,
@@ -61,6 +73,7 @@ export const SUPPORTED_DID_METHODS = ['did:web', 'did:key', 'did:ion', 'did:jwk'
  * Supported DID verification methods
  */
 export const SUPPORTED_VERIFICATION_METHODS = [
+    'JsonWebKey',
     'JsonWebKey2020',
     'Ed25519VerificationKey2020',
     'EcdsaSecp256k1VerificationKey2019',
@@ -187,11 +200,7 @@ export async function validateIcaCredential(
     signerPayload: SignerPayloadMap,
     assertionLabel: string,
     trustedIssuers: string[],
-    options?: {
-        trustedAnchors?: string[];
-        checkRevocation?: boolean;
-        validationTime?: Date;
-    },
+    options?: IdentityAssertionValidationOptions,
 ): Promise<ValidationResult> {
     const result: ValidationResult = new ValidationResult();
 
@@ -287,7 +296,7 @@ export async function validateIcaCredential(
         }
 
         // Step 6: Verify issuer is trusted
-        const issuerTrusted = await verifyIssuerTrust(issuerDid, trustedIssuers, options?.trustedAnchors);
+        const issuerTrusted = await verifyIssuerTrust(issuerDid, trustedIssuers, options?.trustedIcaAnchors);
 
         if (!issuerTrusted) {
             result.addError(
@@ -347,8 +356,6 @@ export async function validateIcaCredential(
             );
         }
     } catch (error) {
-        // console.error('Error during ICA credential validation:');
-        // console.error(error);
         result.addError(
             ValidationStatusCode.IcaInvalidVerifiableCredential,
             assertionLabel,
@@ -415,11 +422,11 @@ function extractPublicKeyFromDidDocument(didDocument: DIDDocument): DIDPublicKey
     const assertionMethods = didDocument.assertionMethod ?? [];
 
     for (const methodId of assertionMethods) {
-        const method = verificationMethods.find(
+        let method = verificationMethods.find(
             (vm: VerificationMethod) => vm.id === methodId || vm.id === `${didDocument.id}${methodId as string}`,
         );
 
-        if (!method) continue;
+        method ??= methodId as unknown as VerificationMethod;
 
         // Check if verification method type is supported
         if (!(SUPPORTED_VERIFICATION_METHODS as readonly string[]).includes(method.type)) {
@@ -427,7 +434,7 @@ function extractPublicKeyFromDidDocument(didDocument: DIDDocument): DIDPublicKey
         }
 
         // Extract public key based on method type
-        if (method.type === 'JsonWebKey2020' && method.publicKeyJwk) {
+        if (['JsonWebKey', 'JsonWebKey2020'].includes(method.type) && method.publicKeyJwk) {
             return method.publicKeyJwk;
         } else if (method.publicKeyMultibase) {
             return method.publicKeyMultibase;
@@ -448,20 +455,297 @@ async function verifyIssuerTrust(
 }
 
 async function verifyCoseSign1(coseSign1: DecodedCoseSign1, publicKey: DIDPublicKey): Promise<boolean> {
-    // console.error(coseSign1)
-    // console.error(publicKey)
-    // Verify COSE_Sign1 signature using public key
-    return true;
+    try {
+        // Validate required fields
+        if (!coseSign1.protectedHeaderBytes || !coseSign1.protectedHeader?.alg || !coseSign1.signature) {
+            return false;
+        }
+
+        // Validate payload
+        if (!coseSign1.payload) {
+            return false;
+        }
+
+        // Get the COSE algorithm
+        const coseAlgorithm = Algorithms.getAlgorithm(coseSign1.protectedHeader.alg as CoseAlgorithmIdentifier);
+        if (!coseAlgorithm) {
+            return false;
+        }
+
+        // Convert DIDPublicKey to DER format and extract algorithm info if available
+        const keyConversionResult = await convertDidPublicKeyToDer(publicKey);
+        if (!keyConversionResult) {
+            return false;
+        }
+        const { derPublicKey, keyAlgorithmInfo } = keyConversionResult;
+
+        // Determine the full signing algorithm with namedCurve if needed
+        const signingAlgorithm = buildSigningAlgorithm(coseAlgorithm.alg, keyAlgorithmInfo);
+        if (!signingAlgorithm) {
+            return false;
+        }
+
+        // Create the Sig_structure and encode it per RFC 8152
+        // Sig_structure = [
+        //   context = "Signature1",
+        //   body_protected = protected header bytes,
+        //   external_aad = empty,
+        //   payload = the credential bytes
+        // ]
+        const sigStructure = new SigStructure('Signature1', coseSign1.protectedHeaderBytes, coseSign1.payload);
+        const toBeSigned = sigStructure.encode();
+
+        // Verify the signature using the existing Crypto infrastructure
+        const isValid = await Crypto.verifySignature(toBeSigned, coseSign1.signature, derPublicKey, signingAlgorithm);
+
+        return isValid;
+    } catch {
+        // Signature verification failed due to exception
+        return false;
+    }
 }
 
-function extractTimestamp(coseSign1: DecodedCoseSign1): unknown | null {
-    // Extract RFC 3161 timestamp from sigTst2 unprotected header
+/**
+ * Convert a DIDPublicKey (JWK or multibase string) to DER SPKI format
+ * @param publicKey - JWK or multibase-encoded public key
+ * @returns Object with DER-encoded SPKI public key and algorithm info, or null if conversion fails
+ */
+async function convertDidPublicKeyToDer(
+    publicKey: DIDPublicKey,
+): Promise<{ derPublicKey: Uint8Array; keyAlgorithmInfo?: { namedCurve?: string; kty?: string } } | null> {
+    try {
+        // Handle JsonWebKey format
+        if (typeof publicKey === 'object' && publicKey !== null) {
+            // Get the algorithm spec from the JWK
+            const keyAlgorithm = getAlgorithmFromJwk(publicKey);
+            if (!keyAlgorithm) {
+                return null;
+            }
+
+            // Import the JWK using Web Crypto API
+            const cryptoKey = await crypto.subtle.importKey('jwk', publicKey, keyAlgorithm, true, ['verify']);
+
+            // Export as SPKI (DER format) for use with Crypto.verifySignature
+            const spkiBuffer = await crypto.subtle.exportKey('spki', cryptoKey);
+            return {
+                derPublicKey: new Uint8Array(spkiBuffer),
+                keyAlgorithmInfo: extractAlgorithmInfo(publicKey),
+            };
+        }
+
+        // Handle multibase string format
+        // Multibase strings typically start with a prefix character indicating the encoding
+        // Common prefixes: 'z' (base58btc), 'b' (base32), 'u' (base64url)
+        // Support for multibase requires additional dependencies not currently in the project
+        // For now, return null to indicate unsupported format
+        if (typeof publicKey === 'string') {
+            // TODO: Add multibase decoding support when multibase library is available
+            return null;
+        }
+
+        return null;
+    } catch {
+        // Return null if any conversion step fails
+        return null;
+    }
+}
+
+/**
+ * Build a SigningAlgorithm from a COSE algorithm and key algorithm info
+ * @param coseAlg - The algorithm from CoseAlgorithm.alg
+ * @param keyAlgorithmInfo - Information about the key (namedCurve, etc.)
+ * @returns Properly constructed SigningAlgorithm or null if unable to construct
+ */
+function buildSigningAlgorithm(
+    coseAlg: Omit<ECDSASigningAlgorithm, 'namedCurve'> | RSASigningAlgorithm | Ed25519SigningAlgorithm,
+    keyAlgorithmInfo?: { namedCurve?: string; kty?: string },
+): SigningAlgorithm | null {
+    // For ECDSA, we need to add the namedCurve from the key
+    if (coseAlg.name === 'ECDSA' && keyAlgorithmInfo?.namedCurve) {
+        const namedCurve = keyAlgorithmInfo.namedCurve;
+        if (['P-256', 'P-384', 'P-521'].includes(namedCurve)) {
+            return {
+                name: 'ECDSA',
+                namedCurve: namedCurve as 'P-256' | 'P-384' | 'P-521',
+                hash: coseAlg.hash,
+            };
+        }
+    }
+
+    // For non-ECDSA algorithms, return as-is (they already have all required properties)
+    if (coseAlg.name !== 'ECDSA') {
+        return coseAlg as SigningAlgorithm;
+    }
+
     return null;
 }
 
+/**
+ * Extract algorithm information from a JWK
+ * @param jwk - JsonWebKey
+ * @returns Object with algorithm information like namedCurve
+ */
+function extractAlgorithmInfo(jwk: JsonWebKey): { namedCurve?: string; kty?: string } {
+    const info: { namedCurve?: string; kty?: string } = { kty: jwk.kty };
+    if (jwk.kty === 'EC' && jwk.crv) {
+        info.namedCurve = jwk.crv;
+    }
+    return info;
+}
+
+/**
+ * Get the Web Crypto algorithm parameters from a JWK
+ * @param jwk - JsonWebKey
+ * @returns Algorithm specification for crypto.subtle operations
+ */
+function getAlgorithmFromJwk(jwk: JsonWebKey): Algorithm | null {
+    if (!jwk.kty) {
+        return null;
+    }
+
+    // Handle EC (Elliptic Curve) keys used for ECDSA
+    if (jwk.kty === 'EC') {
+        if (!jwk.crv) {
+            return null;
+        }
+
+        // Map JWK curve names to WebCrypto named curves
+        const curveMap: Record<string, EcKeyGenParams['namedCurve']> = {
+            'P-256': 'P-256',
+            'P-384': 'P-384',
+            'P-521': 'P-521',
+        };
+
+        const namedCurve = curveMap[jwk.crv];
+        if (!namedCurve) {
+            return null;
+        }
+
+        return {
+            name: 'ECDSA',
+            namedCurve,
+        } as EcKeyImportParams;
+    }
+
+    // Handle RSA keys
+    if (jwk.kty === 'RSA') {
+        return {
+            name: 'RSASSA-PKCS1-v1_5',
+        } as RsaHashedImportParams;
+    }
+
+    // Handle OKP (Octet Key Pair) keys used for EdDSA/Ed25519
+    if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
+        return {
+            name: 'Ed25519',
+        } as Algorithm;
+    }
+
+    return null;
+}
+
+function extractTimestamp(coseSign1: DecodedCoseSign1): unknown | null {
+    const unprotectedHeader = coseSign1.unprotectedHeader;
+    if (!unprotectedHeader || typeof unprotectedHeader !== 'object') {
+        return null;
+    }
+
+    // CAWG Identity 1.2: RFC 3161 timestamp container is sigTst2.
+    // Accept both named and numeric-key encodings for robustness.
+    const sigTst2 = unprotectedHeader.sigTst2 ?? unprotectedHeader[395] ?? unprotectedHeader['395'];
+
+    if (!sigTst2 || typeof sigTst2 !== 'object') {
+        return null;
+    }
+
+    const tstTokens = (sigTst2 as { tstTokens?: unknown }).tstTokens;
+    if (!Array.isArray(tstTokens) || tstTokens.length === 0) {
+        return null;
+    }
+
+    if (!tstTokens[0] || typeof tstTokens[0] !== 'object') {
+        return null;
+    }
+
+    const val = (tstTokens[0] as { val?: unknown }).val;
+    return val ?? null;
+}
+
 async function validateTimestamp(timestamp: unknown): Promise<boolean> {
-    // Validate RFC 3161 timestamp
-    return true;
+    // Validate RFC 3161 timestamp in CAWG sigTst2.
+    // Some producers embed a full TimeStampResp while others embed a bare TimeStampToken (CMS ContentInfo).
+    try {
+        let timestampBytes: Uint8Array | null = null;
+
+        if (timestamp instanceof Uint8Array) {
+            timestampBytes = timestamp;
+        } else if (timestamp instanceof ArrayBuffer) {
+            timestampBytes = new Uint8Array(timestamp);
+        }
+
+        if (!timestampBytes || timestampBytes.length === 0) {
+            return false;
+        }
+
+        let signedData: pkijs.SignedData | null = null;
+
+        // Preferred format: full RFC 3161 TimeStampResp.
+        try {
+            const response = pkijs.TimeStampResp.fromBER(timestampBytes as Uint8Array<ArrayBuffer>);
+            if (
+                response.status.status !== pkijs.PKIStatus.granted &&
+                response.status.status !== pkijs.PKIStatus.grantedWithMods
+            ) {
+                return false;
+            }
+
+            if (response.timeStampToken?.content) {
+                signedData = new pkijs.SignedData({ schema: response.timeStampToken.content });
+            }
+        } catch {
+            // Fallback: bare TimeStampToken (ContentInfo wrapping SignedData).
+            const ber = new Uint8Array(timestampBytes).buffer;
+            const parsed = asn1js.fromBER(ber);
+            if (parsed.offset === -1) {
+                return false;
+            }
+
+            const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+            if (!contentInfo.content) {
+                return false;
+            }
+
+            signedData = new pkijs.SignedData({ schema: contentInfo.content });
+        }
+
+        if (!signedData) {
+            return false;
+        }
+
+        const rawTstInfo = signedData.encapContentInfo.eContent?.getValue();
+        if (!rawTstInfo) {
+            return false;
+        }
+
+        const tstInfo = pkijs.TSTInfo.fromBER(rawTstInfo);
+
+        // Require a supported message-imprint algorithm and non-empty digest.
+        const hashAlgorithm = Crypto.getHashAlgorithmByOID(tstInfo.messageImprint.hashAlgorithm.algorithmId);
+        if (!hashAlgorithm) {
+            return false;
+        }
+
+        const hashedMessage = new Uint8Array(tstInfo.messageImprint.hashedMessage.getValue());
+        if (hashedMessage.length === 0) {
+            return false;
+        }
+
+        // TODO: Match the hashedMessage against the expected hash of the signed credential data
+
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 function validateCredentialValidityDates(
@@ -514,11 +798,10 @@ function validateC2paAssetBinding(
     label: string,
     result: ValidationResult,
 ): void {
-    // TODO: Implement
-    return;
-
     // Convert and compare
+    // return; // Skip deep comparison for now since it is complex
     const convertedPayload = c2paAssetBindingToSignerPayload(c2paAsset);
+
     if (JSON.stringify(convertedPayload) !== JSON.stringify(signerPayload)) {
         result.addError(
             ValidationStatusCode.IcaSignerPayloadMismatch,
@@ -580,6 +863,7 @@ async function parseCoseSign1(data: Uint8Array): Promise<DecodedCoseSign1 | null
         // Decode protected header
         const protectedHeader = JUMBF.CBORBox.decoder.decode(protectedHeaderBytes) as ProtectedHeaderMap;
         return {
+            protectedHeaderBytes,
             protectedHeader: {
                 alg: protectedHeader['1'], // COSE header parameter 1 is "alg"
                 contentType: protectedHeader['3'], // COSE header parameter 3 is "content type"

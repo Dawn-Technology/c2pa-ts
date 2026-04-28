@@ -131,14 +131,17 @@ export function bytesToBase64(bytes: Uint8Array): string {
 /**
  * Convert base64 string to byte array
  */
-export function base64ToBytes(base64: string): Uint8Array {
-    const binary = atob(base64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-        bytes[i] = binary.charCodeAt(i);
+export function base64ToBytes(base64: string | Uint8Array): Uint8Array {
+    // If input is already a number array, convert directly to Uint8Array
+    let base64String: string;
+    if (Array.isArray(base64)) {
+        base64String = new TextDecoder().decode(new Uint8Array(base64));
+    } else if (base64 instanceof Uint8Array) {
+        base64String = new TextDecoder().decode(base64);
+    } else {
+        base64String = base64;
     }
-    return bytes;
+    return Uint8Array.from(Buffer.from(base64String, 'base64'));
 }
 
 /**

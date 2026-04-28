@@ -1,6 +1,7 @@
 import {
     calculatePaddingSize,
     createPadding,
+    IdentityAssertionValidationOptions,
     serializeIdentityAssertion,
     validateIcaCredential,
     validateIdentityAssertion,
@@ -91,7 +92,7 @@ export class IdentityAssertion extends Assertion {
     /** Optional second padding field filled with 0x00 values */
     public pad2?: Uint8Array;
 
-    public readContentFromJUMBF(box: JUMBF.IBox, claim: Claim): void {
+    public readContentFromJUMBF(box: JUMBF.IBox): void {
         if (!(box instanceof JUMBF.CBORBox) || !this.uuid || !BinaryHelper.bufEqual(this.uuid, raw.UUIDs.cborAssertion))
             throw new ValidationError(
                 ValidationStatusCode.AssertionCBORInvalid,
@@ -103,21 +104,21 @@ export class IdentityAssertion extends Assertion {
 
         if (!rawContent.signer_payload)
             throw new ValidationError(
-                ValidationStatusCode.AssertionCBORInvalid,
+                ValidationStatusCode.IdentityCborInvalid,
                 this.sourceBox,
                 'Identity assertion is missing signer_payload',
             );
 
         if (!rawContent.signature)
             throw new ValidationError(
-                ValidationStatusCode.AssertionCBORInvalid,
+                ValidationStatusCode.IdentityCborInvalid,
                 this.sourceBox,
                 'Identity assertion is missing signature',
             );
 
         if (!rawContent.pad1)
             throw new ValidationError(
-                ValidationStatusCode.AssertionCBORInvalid,
+                ValidationStatusCode.IdentityCborInvalid,
                 this.sourceBox,
                 'Identity assertion is missing pad1',
             );
@@ -160,7 +161,10 @@ export class IdentityAssertion extends Assertion {
         return box;
     }
 
-    public override async validate(manifest: Manifest): Promise<ValidationResult> {
+    public override async validate(
+        manifest: Manifest,
+        options?: IdentityAssertionValidationOptions,
+    ): Promise<ValidationResult> {
         const result = await super.validate(manifest);
 
         if (!this.sourceBox) {
@@ -171,7 +175,7 @@ export class IdentityAssertion extends Assertion {
             );
         }
         result.merge(await validateIdentityAssertion(manifest, this, this.label, this.sourceBox));
-        result.merge(await validateIcaCredential(this.signature, this.signerPayload, this.label, []));
+        result.merge(await validateIcaCredential(this.signature, this.signerPayload, this.label, [], options));
         return result;
     }
 

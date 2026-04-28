@@ -1,4 +1,5 @@
 import { Asset } from '../asset';
+import { IdentityAssertionValidationOptions } from '../cawg';
 import { Signer } from '../cose';
 import { HashAlgorithm } from '../crypto';
 import { Crypto } from '../crypto/Crypto';
@@ -247,9 +248,10 @@ export class Manifest implements ManifestComponent {
     /**
      * Verifies the manifest's claim's validity
      * @param asset - Asset for validation of bindings
+     * @param options - Validation options
      * @returns Promise resolving to ValidationResult
      */
-    public async validate(asset: Asset): Promise<ValidationResult> {
+    public async validate(asset: Asset, options?: IdentityAssertionValidationOptions): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         if (!this.claim?.sourceBox) {
@@ -319,7 +321,7 @@ export class Manifest implements ManifestComponent {
         result.merge(await this.validateIngredients());
 
         // TODO: Move to correct location in multistep validation process
-        result.merge(await this.validateIdentityAssertions());
+        result.merge(await this.validateIdentityAssertions(options));
 
         return result;
     }
@@ -412,7 +414,6 @@ export class Manifest implements ManifestComponent {
         const result = new ValidationResult();
 
         // TODO If the assertion’s label is c2pa.cloud-data...
-
         if (assertion.label === AssertionLabels.actions || assertion.label === AssertionLabels.actionsV2) {
             result.merge(await this.validateActionAssertion(assertionReference, assertion as ActionAssertion));
         }
@@ -603,8 +604,8 @@ export class Manifest implements ManifestComponent {
         assertion: ActionAssertion,
     ): ValidationResult {
         const result = new ValidationResult();
-        const hasRequiredAction = assertion.actions.some(
-            a => a.action === ActionType.C2paCreated || a.action === ActionType.C2paOpened,
+        const hasRequiredAction = assertion.actions.some(a =>
+            [ActionType.C2paCreated, ActionType.C2paOpened, ActionType.C2paWatermarked].includes(a.action),
         );
 
         if (!hasRequiredAction) {
@@ -619,15 +620,16 @@ export class Manifest implements ManifestComponent {
 
     /**
      * Validates identity assertions on a manifest
+     * @param options - Validation options
      * @returns ValidationResult containing any validation errors or successes
      */
-    private async validateIdentityAssertions(): Promise<ValidationResult> {
+    private async validateIdentityAssertions(options?: IdentityAssertionValidationOptions): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         // Check for identity  assertions
         const identityAssertions = this.assertions?.getIdentityAssertions() ?? [];
         for (const assertion of identityAssertions) {
-            result.merge(await assertion.validate(this));
+            result.merge(await assertion.validate(this, options));
         }
         return result;
     }
