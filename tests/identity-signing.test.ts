@@ -2,8 +2,11 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { afterAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
+import { createIcaCredential, didResolver, SignatureType } from '../src/cawg';
+import { CoseAlgorithmIdentifier, Signer } from '../src/cose';
+import { SigStructure } from '../src/cose/SigStructure';
 import { Crypto } from '../src/crypto';
-import { SuperBox } from '../src/jumbf';
+import { CBORBox, SuperBox } from '../src/jumbf';
 import {
     Assertion,
     DataHashAssertion,
@@ -14,14 +17,106 @@ import {
 } from '../src/manifest';
 import { loadTestCertificate, TEST_CERTIFICATES } from './utils/testCertificates';
 
+async function getSignerPublicJwk(signer: Signer): Promise<JsonWebKey> {
+    const spki = new Uint8Array(signer.certificate.publicKey.rawData);
+    let importAlgorithm: EcKeyImportParams | Algorithm;
+    if (signer.algorithm === CoseAlgorithmIdentifier.Ed25519) {
+        importAlgorithm = { name: 'Ed25519' };
+    } else {
+        importAlgorithm = {
+            name: 'ECDSA',
+            namedCurve: 'P-256',
+        };
+    }
+
+    const publicKey = await crypto.subtle.importKey('spki', spki, importAlgorithm, true, ['verify']);
+    return crypto.subtle.exportKey('jwk', publicKey);
+}
+
+function installDidResolverMock(issuerDid: string, publicJwk: JsonWebKey): () => void {
+    const originalResolve = didResolver.resolve.bind(didResolver);
+    didResolver.resolve = (async (did: string) => {
+        if (did !== issuerDid) {
+            return originalResolve(did);
+        }
+
+        const methodId = `${issuerDid}#key-1`;
+        return {
+            didDocument: {
+                id: issuerDid,
+                verificationMethod: [
+                    {
+                        id: methodId,
+                        type: 'JsonWebKey2020',
+                        controller: issuerDid,
+                        publicKeyJwk: publicJwk,
+                    },
+                ],
+                assertionMethod: [methodId],
+            },
+            didResolutionMetadata: {},
+            didDocumentMetadata: {},
+        };
+    }) as typeof didResolver.resolve;
+
+    return () => {
+        didResolver.resolve = originalResolve;
+    };
+}
+
+async function createIcaCoseSign1(payload: Uint8Array, signer: Signer): Promise<Uint8Array> {
+    const protectedHeaderBytes = CBORBox.encoder.encode(
+        new Map<number, unknown>([
+            [1, signer.algorithm],
+            [3, 'application/vc'],
+        ]),
+    );
+
+    const toBeSigned = new SigStructure('Signature1', protectedHeaderBytes, payload).encode();
+    const signature = await signer.sign(toBeSigned);
+
+    const coseSign1 = [protectedHeaderBytes, {}, payload, signature];
+    const cborBox = new CBORBox();
+    cborBox.tag = 18;
+    cborBox.content = coseSign1;
+    cborBox.generateRawContent();
+    return cborBox.rawContent!;
+}
+
+function adjustIdentityAssertionSize(
+    identityAssertion: IdentityAssertion,
+    manifest: Manifest,
+    targetAssertionSize: number,
+): void {
+    for (let i = 0; i < 4; i++) {
+        const currentSize = identityAssertion.generateJUMBFBox(manifest.claim).toBuffer(false).length;
+        if (currentSize === targetAssertionSize) {
+            return;
+        }
+        if (currentSize > targetAssertionSize) {
+            throw new Error('ICA credential exceeds reserved assertion size');
+        }
+
+        const delta = targetAssertionSize - currentSize;
+        identityAssertion.pad1 = new Uint8Array(identityAssertion.pad1.length + delta).fill(0x00);
+    }
+
+    const finalSize = identityAssertion.generateJUMBFBox(manifest.claim).toBuffer(false).length;
+    if (finalSize !== targetAssertionSize) {
+        throw new Error('Failed to match reserved identity assertion size');
+    }
+}
+
 // Location of the image to sign with identity assertion
-const sourceFile = 'tests/fixtures/trustnxt-icon.jpg';
-const targetFile = 'tests/fixtures/trustnxt-icon-signed-with-identity.jpg';
+const sourceFile = 'tests/fixtures/dawn-technology-icon.jpg';
+const targetFile = 'tests/fixtures/dawn-technology-icon-signed-with-identity.jpg';
 
 describe('Identity Assertion Signing Tests', function () {
     for (const certificate of TEST_CERTIFICATES) {
         describe(`using ${certificate.name}`, function () {
             let manifest: Manifest | undefined;
+            let issuerDid: string | undefined;
+            let issuerPublicJwk: JsonWebKey | undefined;
 
             it('add a manifest with identity assertion to a JPEG test file', async function () {
                 const { signer, timestampProvider } = await loadTestCertificate(certificate);
@@ -56,17 +151,21 @@ describe('Identity Assertion Signing Tests', function () {
                     [
                         {
                             url: `self#jumbf=c2pa.assertions/c2pa.hash.data`,
-                            alg: 'SHA-256',
                             hash: new Uint8Array(32).fill(0x00),
                         },
                     ],
-                    'cawg.x509.cose',
+                    SignatureType.X509Cose,
                     ['cawg.creator'],
                 );
-                identityAssertion.setSignature(new Uint8Array(64).fill(0xaa), new Uint8Array(256).fill(0x00));
+                // Reserve enough space up-front for the real COSE_Sign1 ICA credential.
+                identityAssertion.setSignature(new Uint8Array(4096).fill(0xaa), new Uint8Array(256).fill(0x00));
 
                 // Add the identity assertion to the manifest
                 manifest.addAssertion(identityAssertion);
+
+                const reservedIdentityAssertionSize = identityAssertion
+                    .generateJUMBFBox(manifest.claim)
+                    .toBuffer(false).length;
 
                 // Make space in the asset for the manifest (now includes identity assertion)
                 await asset.ensureManifestSpace(manifestStore.measureSize());
@@ -77,22 +176,56 @@ describe('Identity Assertion Signing Tests', function () {
                 // Data hash assertion should have a hash after updateWithAsset
                 assert(dataHashAssertion.hash, 'Data hash assertion should have a hash after updateWithAsset');
 
+                // First signing pass populates claim assertion hashes used by hard-binding validation.
+                await manifest.sign(signer, timestampProvider);
+
+                assert(manifest.claim, 'Manifest claim missing after signing');
+
+                const hardBindingRef = manifest.claim.assertions.find(
+                    ref => ref.uri === `self#jumbf=c2pa.assertions/${dataHashAssertion.fullLabel}`,
+                );
+                assert(hardBindingRef, 'Hard binding reference not found in claim assertions');
+
                 // Update the identity assertion with the correct hash
                 identityAssertion.setSignerPayload(
                     [
                         {
-                            url: `self#jumbf=c2pa.assertions/c2pa.hash.data`,
-                            alg: 'SHA-256',
-                            hash: dataHashAssertion.hash,
+                            url: hardBindingRef.uri,
+                            hash: hardBindingRef.hash,
                         },
                     ],
-                    'cawg.x509.cose',
+                    SignatureType.X509Cose,
                     ['cawg.creator'],
                 );
 
-                // Set signature and padding (in real implementation, this would be a proper COSE signature)
-                // For testing purposes, we'll use placeholder values
-                identityAssertion.setSignature(new Uint8Array(64).fill(0xaa), new Uint8Array(256).fill(0x00));
+                issuerDid = `did:jwk:identity-signing:${certificate.name.replace(/\s+/g, '-').toLowerCase()}`;
+                issuerPublicJwk = await getSignerPublicJwk(signer);
+                const icaCredential = createIcaCredential(
+                    issuerDid,
+                    {
+                        verifiedIdentities: [
+                            {
+                                type: 'cawg.social_media',
+                                name: 'Sample Creator',
+                                username: 'sample-creator',
+                                uri: 'https://example.com/sample-creator',
+                                provider: {
+                                    id: 'https://example.com',
+                                    name: 'Example Identity Provider',
+                                },
+                                verifiedAt: new Date().toISOString(),
+                            },
+                        ],
+                    },
+                    identityAssertion.signerPayload,
+                    new Date(),
+                );
+
+                const icaCredentialBytes = new TextEncoder().encode(JSON.stringify(icaCredential));
+                const icaSignature = await createIcaCoseSign1(icaCredentialBytes, signer);
+
+                identityAssertion.setSignature(icaSignature, new Uint8Array(256).fill(0x00));
+                adjustIdentityAssertionSize(identityAssertion, manifest, reservedIdentityAssertionSize);
 
                 // Create the manifest signature
                 await manifest.sign(signer, timestampProvider);
@@ -139,15 +272,26 @@ describe('Identity Assertion Signing Tests', function () {
                 assert.ok(identityAssertion instanceof IdentityAssertion, 'assertion is not an IdentityAssertion');
 
                 // Verify identity assertion properties
-                assert.equal(identityAssertion.signerPayload.sig_type, 'cawg.x509.cose');
+                assert.equal(identityAssertion.signerPayload.sig_type, SignatureType.X509Cose);
                 assert.deepEqual(identityAssertion.signerPayload.role, ['cawg.creator']);
                 assert.equal(identityAssertion.signerPayload.referenced_assertions.length, 1);
 
                 // Verify the manifest signature
+                if (!issuerDid || !issuerPublicJwk) {
+                    throw new Error('Missing mocked DID issuer data for validation');
+                }
+                const restoreDidResolver = installDidResolverMock(issuerDid, issuerPublicJwk);
                 const validationResult = await manifestStore.validate(asset);
+                restoreDidResolver();
 
                 // Check overall validity
-                assert.ok(validationResult.isValid, 'Validation result invalid');
+                assert.ok(
+                    validationResult.isValid,
+                    `Validation result invalid: ${validationResult.statusEntries
+                        .filter(e => !e.success)
+                        .map(e => `${e.code}${e.explanation ? ` (${e.explanation})` : ''}`)
+                        .join(', ')}`,
+                );
 
                 // Verify identity assertion is present in the validation
                 const identityHashCheck = validationResult.statusEntries.find(
@@ -166,7 +310,7 @@ describe('Identity Assertion Signing Tests', function () {
 
 describe('Identity Assertion with Multiple Roles', function () {
     let manifest: Manifest | undefined;
-    const targetFileMultiRole = 'tests/fixtures/trustnxt-icon-signed-multi-role.jpg';
+    const targetFileMultiRole = 'tests/fixtures/dawn-technology-icon-signed-multi-role.jpg';
 
     it('create manifest with identity assertion having multiple roles', async function () {
         const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
@@ -195,7 +339,7 @@ describe('Identity Assertion with Multiple Roles', function () {
                     hash: new Uint8Array(32).fill(0), // Placeholder
                 },
             ],
-            'cawg.x509.cose',
+            SignatureType.X509Cose,
             ['cawg.creator', 'cawg.editor', 'cawg.contributor'],
         );
         identityAssertion.setSignature(new Uint8Array(64).fill(0xbb), new Uint8Array(256).fill(0x00));
@@ -217,7 +361,7 @@ describe('Identity Assertion with Multiple Roles', function () {
                     hash: dataHashAssertionHash,
                 },
             ],
-            'cawg.x509.cose',
+            SignatureType.X509Cose,
             ['cawg.creator', 'cawg.editor', 'cawg.contributor'],
         );
 
@@ -257,7 +401,7 @@ describe('Identity Assertion with Multiple Roles', function () {
 
 describe('Identity Assertion with Optional Fields', function () {
     let manifest: Manifest | undefined;
-    const targetFileOptional = 'tests/fixtures/trustnxt-icon-signed-optional-fields.jpg';
+    const targetFileOptional = 'tests/fixtures/dawn-technology-icon-signed-optional-fields.jpg';
 
     it('create manifest with identity assertion with optional fields', async function () {
         const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
@@ -286,7 +430,7 @@ describe('Identity Assertion with Optional Fields', function () {
                     hash: new Uint8Array(32).fill(0), // Placeholder
                 },
             ],
-            'cawg.x509.cose',
+            SignatureType.X509Cose,
             ['cawg.publisher'],
             {
                 expectedPartialClaim: { alg: 'sha256', hash: new Uint8Array(32).fill(0x11) },
@@ -323,7 +467,7 @@ describe('Identity Assertion with Optional Fields', function () {
                     hash: dataHashAssertionHash,
                 },
             ],
-            'cawg.x509.cose',
+            SignatureType.X509Cose,
             ['cawg.publisher'],
             {
                 expectedPartialClaim,
@@ -413,7 +557,7 @@ describe('Identity Assertion Reference Verification', function () {
                     hash: dataHashAssertionHash,
                 },
             ],
-            'cawg.x509.cose',
+            SignatureType.X509Cose,
             ['cawg.creator'],
         );
 

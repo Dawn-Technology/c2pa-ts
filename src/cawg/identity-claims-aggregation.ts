@@ -814,7 +814,6 @@ function validateC2paAssetBinding(
     result: ValidationResult,
 ): void {
     // Convert and compare
-    // return; // Skip deep comparison for now since it is complex
     const convertedPayload = c2paAssetBindingToSignerPayload(c2paAsset);
 
     if (JSON.stringify(convertedPayload) !== JSON.stringify(signerPayload)) {
@@ -876,13 +875,31 @@ async function parseCoseSign1(data: Uint8Array): Promise<DecodedCoseSign1 | null
         const [protectedHeaderBytes, unprotectedHeader, payload, signature] = cborDecodedValue;
 
         // Decode protected header
-        const protectedHeader = JUMBF.CBORBox.decoder.decode(protectedHeaderBytes) as ProtectedHeaderMap;
+        const protectedHeader = JUMBF.CBORBox.decoder.decode(protectedHeaderBytes) as
+            | ProtectedHeaderMap
+            | Map<number | string, unknown>;
+
+        const getProtectedHeaderParam = (label: number): unknown => {
+            if (protectedHeader instanceof Map) {
+                if (protectedHeader.has(label)) {
+                    return protectedHeader.get(label);
+                }
+                const stringLabel = String(label);
+                if (protectedHeader.has(stringLabel)) {
+                    return protectedHeader.get(stringLabel);
+                }
+                return undefined;
+            }
+
+            return protectedHeader[String(label) as keyof ProtectedHeaderMap];
+        };
+
         return {
             protectedHeaderBytes,
             protectedHeader: {
-                alg: protectedHeader['1'], // COSE header parameter 1 is "alg"
-                contentType: protectedHeader['3'], // COSE header parameter 3 is "content type"
-                x5chain: protectedHeader['33'], // COSE header parameter 33 is "x5chain"
+                alg: getProtectedHeaderParam(1) as number, // COSE header parameter 1 is "alg"
+                contentType: getProtectedHeaderParam(3) as string | number | undefined, // COSE header parameter 3 is "content type"
+                x5chain: getProtectedHeaderParam(33) as Uint8Array | Uint8Array[], // COSE header parameter 33 is "x5chain"
             },
             unprotectedHeader,
             payload,

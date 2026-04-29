@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'bun:test';
+import { SignatureType } from '../../../src/cawg';
 import { CBORBox, DescriptionBox, SuperBox } from '../../../src/jumbf';
 import { Assertion, Claim, IdentityAssertion } from '../../../src/manifest';
 import * as raw from '../../../src/manifest/rawTypes';
@@ -20,7 +21,7 @@ describe('IdentityAssertion Tests', function () {
                     ]),
                 },
             ],
-            sig_type: 'cawg.x509.cose',
+            sig_type: SignatureType.X509Cose,
             role: ['cawg.creator'],
         },
         signature: new Uint8Array([
@@ -61,7 +62,7 @@ describe('IdentityAssertion Tests', function () {
         assert.deepEqual(identityAssertion.uuid, raw.UUIDs.cborAssertion);
 
         // Verify signer payload
-        assert.equal(identityAssertion.signerPayload.sig_type, 'cawg.x509.cose');
+        assert.equal(identityAssertion.signerPayload.sig_type, SignatureType.X509Cose);
         assert.deepEqual(identityAssertion.signerPayload.role, ['cawg.creator']);
         assert.equal(identityAssertion.signerPayload.referenced_assertions.length, 1);
         assert.equal(
@@ -100,7 +101,7 @@ describe('IdentityAssertion Tests', function () {
         assert.ok(box.contentBoxes[0] instanceof CBORBox);
 
         const content = box.contentBoxes[0].content as typeof exampleIdentityAssertion;
-        assert.equal(content.signer_payload.sig_type, 'cawg.x509.cose');
+        assert.equal(content.signer_payload.sig_type, SignatureType.X509Cose);
         assert.deepEqual(content.signer_payload.role, ['cawg.creator']);
         assert.deepEqual(content.signature, exampleIdentityAssertion.signature);
         assert.deepEqual(content.pad1, exampleIdentityAssertion.pad1);
@@ -118,7 +119,7 @@ describe('IdentityAssertion Tests', function () {
                     hash: new Uint8Array(32).fill(0xff),
                 },
             ],
-            'cawg.x509.cose',
+            SignatureType.X509Cose,
             ['cawg.creator', 'cawg.contributor'],
         );
 
@@ -140,7 +141,7 @@ describe('IdentityAssertion Tests', function () {
         readBackAssertion.readFromJUMBF(box, claim);
 
         assert.equal(readBackAssertion.label, 'cawg.identity');
-        assert.equal(readBackAssertion.signerPayload.sig_type, 'cawg.x509.cose');
+        assert.equal(readBackAssertion.signerPayload.sig_type, SignatureType.X509Cose);
         assert.deepEqual(readBackAssertion.signerPayload.role, ['cawg.creator', 'cawg.contributor']);
         assert.equal(readBackAssertion.signerPayload.referenced_assertions.length, 1);
         assert.equal(
@@ -173,7 +174,7 @@ describe('IdentityAssertion Tests', function () {
                             hash: new Uint8Array(32).fill(0x33),
                         },
                     ],
-                    sig_type: 'cawg.identity_claims_aggregation',
+                    sig_type: SignatureType.X509Cose,
                 },
                 expected_credentials: {
                     alg: 'sha256',
@@ -189,7 +190,7 @@ describe('IdentityAssertion Tests', function () {
                     hash: new Uint8Array(32).fill(0x55),
                 },
             ],
-            'cawg.x509.cose',
+            SignatureType.X509Cose,
             ['cawg.editor'],
             {
                 expectedPartialClaim,
@@ -210,7 +211,7 @@ describe('IdentityAssertion Tests', function () {
         assert.equal(readBackAssertion.signerPayload.expected_countersigners?.length, 1);
         assert.deepEqual(
             readBackAssertion.signerPayload.expected_countersigners?.[0].partial_signer_payload.sig_type,
-            'cawg.identity_claims_aggregation',
+            SignatureType.X509Cose,
         );
     });
 
@@ -224,7 +225,7 @@ describe('IdentityAssertion Tests', function () {
                     hash: new Uint8Array(32).fill(0xcc),
                 },
             ],
-            'cawg.identity_claims_aggregation',
+            SignatureType.X509Cose,
         );
 
         const testPad2 = new Uint8Array(256).fill(0x00);
@@ -268,7 +269,7 @@ describe('IdentityAssertion Tests', function () {
         cborBox.content = {
             signer_payload: {
                 referenced_assertions: [],
-                sig_type: 'cawg.x509.cose',
+                sig_type: SignatureType.X509Cose,
             },
             pad1: new Uint8Array(128),
         };
@@ -290,7 +291,7 @@ describe('IdentityAssertion Tests', function () {
         cborBox.content = {
             signer_payload: {
                 referenced_assertions: [],
-                sig_type: 'cawg.x509.cose',
+                sig_type: SignatureType.X509Cose,
             },
             signature: new Uint8Array(64),
         };
