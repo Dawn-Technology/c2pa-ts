@@ -33,6 +33,13 @@ async function getSignerPublicJwk(signer: Signer): Promise<JsonWebKey> {
     return crypto.subtle.exportKey('jwk', publicKey);
 }
 
+function createDidJwk(publicJwk: JsonWebKey): string {
+    // did:jwk requires a base64url-encoded JSON JWK as method-specific identifier.
+    const canonicalJwk = Object.fromEntries(Object.entries(publicJwk).sort(([a], [b]) => a.localeCompare(b)));
+    const didPayload = Buffer.from(JSON.stringify(canonicalJwk), 'utf8').toString('base64url');
+    return `did:jwk:${didPayload}`;
+}
+
 function installDidResolverMock(issuerDid: string, publicJwk: JsonWebKey): () => void {
     const originalResolve = didResolver.resolve.bind(didResolver);
     didResolver.resolve = (async (did: string) => {
@@ -198,8 +205,8 @@ describe('Identity Assertion Signing Tests', function () {
                     ['cawg.creator'],
                 );
 
-                issuerDid = `did:jwk:identity-signing:${certificate.name.replace(/\s+/g, '-').toLowerCase()}`;
                 issuerPublicJwk = await getSignerPublicJwk(signer);
+                issuerDid = createDidJwk(issuerPublicJwk);
                 const icaCredential = createIcaCredential(
                     issuerDid,
                     {
