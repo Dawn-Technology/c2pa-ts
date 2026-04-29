@@ -163,6 +163,6 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
 
     afterAll(async function () {
         // Delete test file, ignore the case it doesn't exist
-        // await fs.unlink(targetFile).catch(() => undefined);
+        await fs.unlink(targetFile).catch(() => undefined);
     });
 });

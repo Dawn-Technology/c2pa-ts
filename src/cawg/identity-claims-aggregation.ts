@@ -19,6 +19,7 @@ import type {
 } from '../crypto/types';
 import * as JUMBF from '../jumbf';
 import { ValidationResult, ValidationStatusCode } from '../manifest';
+import { BinaryHelper } from '../util';
 import { didResolver } from './did-resolver';
 import type {
     C2paAssetBinding,
@@ -321,7 +322,11 @@ export async function validateIcaCredential(
         // Step 8: Verify timestamp if present
         const timestamp = extractTimestamp(coseSign1);
         if (timestamp) {
-            const timestampValid = await validateTimestamp(timestamp);
+            const timestampValid = await validateTimestamp(
+                timestamp,
+                coseSign1.protectedHeaderBytes,
+                coseSign1.signature,
+            );
             if (timestampValid) {
                 result.addInformational(
                     ValidationStatusCode.IcaTimeStampValidated,
@@ -644,7 +649,7 @@ function getAlgorithmFromJwk(jwk: JsonWebKey): Algorithm | null {
     return null;
 }
 
-function extractTimestamp(coseSign1: DecodedCoseSign1): unknown | null {
+function extractTimestamp(coseSign1: DecodedCoseSign1): Uint8Array | ArrayBuffer | null {
     const unprotectedHeader = coseSign1.unprotectedHeader;
     if (!unprotectedHeader || typeof unprotectedHeader !== 'object') {
         return null;
@@ -668,10 +673,14 @@ function extractTimestamp(coseSign1: DecodedCoseSign1): unknown | null {
     }
 
     const val = (tstTokens[0] as { val?: unknown }).val;
-    return val ?? null;
+    return (val as Uint8Array | ArrayBuffer) ?? null;
 }
 
-async function validateTimestamp(timestamp: unknown): Promise<boolean> {
+async function validateTimestamp(
+    timestamp: Uint8Array | ArrayBuffer,
+    rawProtectedBucket: Uint8Array,
+    signature: Uint8Array,
+): Promise<boolean> {
     // Validate RFC 3161 timestamp in CAWG sigTst2.
     // Some producers embed a full TimeStampResp while others embed a bare TimeStampToken (CMS ContentInfo).
     try {
@@ -740,7 +749,13 @@ async function validateTimestamp(timestamp: unknown): Promise<boolean> {
             return false;
         }
 
-        // TODO: Match the hashedMessage against the expected hash of the signed credential data
+        // sigTst2 (CAWG/C2PA v2) timestamps the CBOR-wrapped signature bytes, not the raw signature bytes.
+        const signaturePayload = JUMBF.CBORBox.encoder.encode(signature);
+        const toBeSigned = new SigStructure('CounterSignature', rawProtectedBucket, signaturePayload).encode();
+        const actualHash = await Crypto.digest(toBeSigned, hashAlgorithm);
+        if (!BinaryHelper.bufEqual(actualHash, hashedMessage)) {
+            return false;
+        }
 
         return true;
     } catch {

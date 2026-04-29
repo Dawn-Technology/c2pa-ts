@@ -8,7 +8,6 @@
 import { Crypto, HashAlgorithm } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
-import { HashAssertion } from '../manifest/assertions/HashAssertion';
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
 import {
     SignatureType,
@@ -47,6 +46,11 @@ export async function validateIdentityAssertion(
     options: IdentityAssertionValidationOptions = {},
 ): Promise<ValidationResult> {
     const result: ValidationResult = new ValidationResult();
+
+    // Step 1: Verify hard binding assertion is included and correct
+    result.merge(
+        await validateHardBindingReference(assertion.signerPayload.referenced_assertions, manifest, sourceBox),
+    );
 
     // Step 2: Validate required fields
     if (!assertion.signerPayload || !assertion.signature || !assertion.pad1) {
@@ -87,7 +91,7 @@ export async function validateIdentityAssertion(
         return result;
     }
 
-    // Step 5: Check for duplicate references
+    // Step 4: Check for duplicate references
     const duplicates = findDuplicateReferences(payload.referenced_assertions);
     if (duplicates.length > 0) {
         result.addError(
@@ -97,28 +101,25 @@ export async function validateIdentityAssertion(
         );
     }
 
-    // Step 6: Verify referenced assertions exist in claim
+    // Step 5: Verify referenced assertions exist in claim
     result.merge(await validateReferencedAssertions(payload.referenced_assertions, manifest, sourceBox));
 
-    // Step 7: Verify hard binding assertion is included and correct
-    result.merge(await validateHardBindingReference(payload.referenced_assertions, manifest, sourceBox));
-
-    // Step 8: Validate expected_partial_claim if present
+    // Step 6: Validate expected_partial_claim if present
     if (payload.expected_partial_claim) {
         result.merge(await validateExpectedPartialClaim(payload, sourceBox, assertionLabel));
     }
 
-    // Step 9: Validate expected_claim_generator if present
+    // Step 7: Validate expected_claim_generator if present
     if (payload.expected_claim_generator) {
         result.merge(await validateExpectedClaimGenerator(payload.expected_claim_generator, sourceBox));
     }
 
-    // Step 10: Validate expected_countersigners if present
+    // Step 8: Validate expected_countersigners if present
     if (payload.expected_countersigners) {
         result.merge(await validateExpectedCountersigners(payload.expected_countersigners, sourceBox, assertionLabel));
     }
 
-    // Step 11: Validate signature based on sig_type
+    // Step 9: Validate signature based on sig_type
     // This is delegated to credential-type-specific validators
     if (result.isValid) {
         // If no failures so far, consider it well-formed at minimum
@@ -139,7 +140,7 @@ async function validateReferencedAssertions(
     const result = new ValidationResult();
 
     for (const ref of references) {
-        const found = manifest.assertions?.getAssertionsByLabel(ref.url);
+        const found = manifest.assertions?.getAssertionsByLabel(extractAssertionLabel(ref.url) ?? '');
 
         if (!found || found.length === 0) {
             result.addError(
@@ -179,7 +180,9 @@ async function validateHardBindingReference(
     // Verify it's the correct hard binding for this manifest
     // The correct one is determined by the algorithm described in
     // C2PA spec Section 15.12
-    const expectedHardBindings = manifest.assertions?.getHardBindings();
+    const expectedHardBindings = manifest.claim?.assertions?.filter(
+        assertion => assertion.uri && isHardBindingAssertion(extractAssertionLabel(assertion.uri) ?? ''),
+    );
 
     if (!expectedHardBindings || expectedHardBindings.length === 0) {
         // No hard binding found in claim
@@ -191,28 +194,25 @@ async function validateHardBindingReference(
         return result;
     }
     const correctRef = hardBindingRefs.find(ref => {
-        const expectedHardBinding = expectedHardBindings.find(
-            binding => binding.label === extractAssertionLabel(ref.url),
-        ) as Assertion & HashAssertion;
+        const expectedHardBinding = expectedHardBindings.find(binding => binding.uri === ref.url);
         return (
             expectedHardBinding &&
             hashMapsEqual(
-                { hash: ref.hash, alg: ref.alg ?? '' },
+                { hash: ref.hash, alg: '' },
                 {
-                    hash: expectedHardBinding.hash!,
-                    alg: expectedHardBinding.algorithm!,
+                    hash: expectedHardBinding.hash,
+                    alg: '',
                 },
             )
         );
     });
 
     if (!correctRef) {
-        // TODO: Implement correct hard binding reference validation once we have a way to determine the correct hard binding assertion for the manifest
-        //     result.addError(
-        //         ValidationStatusCode.IdentityHardBindingIncorrect,
-        //         sourceBox,
-        //         'Hard binding reference does not match the active manifest binding',
-        //     );
+        result.addError(
+            ValidationStatusCode.IdentityHardBindingIncorrect,
+            sourceBox,
+            'Hard binding reference does not match the active manifest binding',
+        );
     }
 
     return result;

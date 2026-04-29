@@ -7,6 +7,7 @@ import { SuperBox } from '../../src/jumbf';
 import { ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
 import { BinaryHelper } from '../../src/util';
 
+
 const baseDir = 'tests/fixtures/identity/image';
 
 interface TestIdentityExpectations {
@@ -127,13 +128,12 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         valid: true,
         statusCodes: [ValidationStatusCode.IcaTimeStampValidated],
     },
-    // TODO: re-enable once time stamp validation is implemented
-    // 'invalid_time_stamp.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IcaTimeStampInvalid],
-    // },
+    'invalid_time_stamp.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IcaTimeStampInvalid],
+    },
     'valid_from_missing.jpg': {
         assetType: JPEG,
         jumbf: true,
@@ -200,13 +200,12 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         valid: false,
         statusCodes: [ValidationStatusCode.IdentityAssertionDuplicate],
     },
-    // TODO: re-enable once hard binding validation is implemented
-    // 'no_hard_binding.jpg': {
-    //     assetType: JPEG,
-    //     jumbf: true,
-    //     valid: false,
-    //     statusCodes: [ValidationStatusCode.IdentityHardBindingMissing],
-    // },
+    'no_hard_binding.jpg': {
+        assetType: JPEG,
+        jumbf: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.IdentityHardBindingMissing],
+    },
     'invalid_sig_type.jpg': {
         assetType: JPEG,
         jumbf: true,
@@ -234,16 +233,6 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         ],
     },
 };
-
-// // test data sets with file names and expected outcomes
-// testIdentityFiles = {
-//     'invalid_time_stamp.jpg': {
-//         assetType: JPEG,
-//         jumbf: true,
-//         valid: false,
-//         statusCodes: [ValidationStatusCode.IcaTimeStampInvalid],
-//     },
-// };
 
 describe('Functional Identity Asset Reading Tests', function () {
     for (const [filename, data] of Object.entries(testIdentityFiles)) {
