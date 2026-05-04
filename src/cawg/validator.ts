@@ -23,6 +23,7 @@ import {
     extractAssertionLabel,
     findDuplicateReferences,
     hashMapsEqual,
+    isEmptyOrMissing,
     isHardBindingAssertion,
     serializeClaimData,
     validatePadding,
@@ -55,7 +56,7 @@ export async function validateIdentityAssertion(
     );
 
     // Step 2: Validate required fields
-    if (!assertion.signerPayload || !assertion.signature || !assertion.pad1) {
+    if (!assertion.signerPayload || isEmptyOrMissing(assertion.signature) || isEmptyOrMissing(assertion.pad1)) {
         result.addError(
             ValidationStatusCode.AssertionCBORInvalid,
             sourceBox,
@@ -93,7 +94,7 @@ export async function validateIdentityAssertion(
         return result;
     }
 
-    // Step 4: Check for duplicate references
+    // Step 5: Check for duplicate references
     const duplicates = findDuplicateReferences(payload.referenced_assertions);
     if (duplicates.length > 0) {
         result.addError(
@@ -103,25 +104,25 @@ export async function validateIdentityAssertion(
         );
     }
 
-    // Step 5: Verify referenced assertions exist in claim
+    // Step 6: Verify referenced assertions exist in claim
     result.merge(await validateReferencedAssertions(payload.referenced_assertions, manifest, sourceBox));
 
-    // Step 6: Validate expected_partial_claim if present
+    // Step 7: Validate expected_partial_claim if present
     if (payload.expected_partial_claim) {
         result.merge(await validateExpectedPartialClaim(payload, sourceBox, assertionLabel));
     }
 
-    // Step 7: Validate expected_claim_generator if present
+    // Step 8: Validate expected_claim_generator if present
     if (payload.expected_claim_generator) {
         result.merge(await validateExpectedClaimGenerator(payload.expected_claim_generator, sourceBox));
     }
 
-    // Step 8: Validate expected_countersigners if present
+    // Step 9: Validate expected_countersigners if present
     if (payload.expected_countersigners) {
         result.merge(await validateExpectedCountersigners(payload.expected_countersigners, sourceBox, assertionLabel));
     }
 
-    // Step 9: Validate signature based on sig_type
+    // Step 10: Validate signature based on sig_type
     // This is delegated to credential-type-specific validators
     if (result.isValid) {
         // If no failures so far, consider it well-formed at minimum

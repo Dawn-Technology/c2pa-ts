@@ -197,7 +197,7 @@ export interface IdentityClaimsCredentialSubject {
 /**
  * Base for Identity claims aggregation verifiable credential (ICA-VC) and Verifiable Credential (VC)
  */
-export interface VerifiableCredentialBase {
+export interface VerifiableCredential {
     /** JSON-LD context */
     '@context': string[];
     /** Credential types */
@@ -224,17 +224,9 @@ export interface VerifiableCredentialBase {
 }
 
 /**
- * Verifiable Credential
- */
-export interface VerifiableCredential extends VerifiableCredentialBase {
-    /** Credential subject */
-    credentialSubject: IdentityClaimsCredentialSubject;
-}
-
-/**
  * Identity claims aggregation verifiable credential
  */
-export interface IdentityClaimsAggregationCredential extends VerifiableCredentialBase {
+export interface IdentityClaimsAggregationCredential extends VerifiableCredential {
     /** Array of verified identities */
     verifiedIdentities: VerifiedIdentity[];
 }
@@ -398,7 +390,7 @@ export const SCHEMA_URL = {
 /**
  * Supported DID methods
  */
-export const SUPPORTED_DID_METHODS = ['did:web', 'did:key', 'did:ion', 'did:jwk'] as const;
+export const SUPPORTED_DID_METHODS = ['did:web', 'did:key', 'did:jwk'] as const;
 
 /**
  * Supported DID verification methods
@@ -406,6 +398,7 @@ export const SUPPORTED_DID_METHODS = ['did:web', 'did:key', 'did:ion', 'did:jwk'
 export const SUPPORTED_VERIFICATION_METHODS = [
     'JsonWebKey',
     'JsonWebKey2020',
+    'Ed25519VerificationKey2018',
     'Ed25519VerificationKey2020',
     'EcdsaSecp256k1VerificationKey2019',
 ] as const;

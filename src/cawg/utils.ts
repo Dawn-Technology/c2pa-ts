@@ -355,3 +355,10 @@ export function arrayEquals(a: Uint8Array, b: Uint8Array): boolean {
 export function deepEqual(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
 }
+
+/**
+ * Helper: Check if Uint8Array does not exist or is empty
+ */
+export function isEmptyOrMissing(data: Uint8Array | null | undefined): boolean {
+    return !data || data.length === 0;
+}

@@ -1,4 +1,9 @@
-import { IdentityAssertionValidationOptions, validateIcaCredential, validateIdentityAssertion } from '../../cawg';
+import {
+    IdentityAssertionValidationOptions,
+    isEmptyOrMissing,
+    validateIcaCredential,
+    validateIdentityAssertion,
+} from '../../cawg';
 import * as JUMBF from '../../jumbf';
 import { BinaryHelper } from '../../util';
 import { Claim } from '../Claim';
@@ -102,14 +107,14 @@ export class IdentityAssertion extends Assertion {
                 'Identity assertion is missing signer_payload',
             );
 
-        if (!rawContent.signature)
+        if (isEmptyOrMissing(rawContent.signature))
             throw new ValidationError(
                 ValidationStatusCode.IdentityCborInvalid,
                 this.sourceBox,
                 'Identity assertion is missing signature',
             );
 
-        if (!rawContent.pad1)
+        if (isEmptyOrMissing(rawContent.pad1))
             throw new ValidationError(
                 ValidationStatusCode.IdentityCborInvalid,
                 this.sourceBox,
@@ -167,7 +172,7 @@ export class IdentityAssertion extends Assertion {
                 'Identity assertion is missing source box reference',
             );
         }
-        result.merge(await validateIdentityAssertion(manifest, this, this.label, this.sourceBox));
+        result.merge(await validateIdentityAssertion(manifest, this, this.label, this.sourceBox, options));
         result.merge(await validateIcaCredential(this.signature, this.signerPayload, this.label, [], options));
         return result;
     }
