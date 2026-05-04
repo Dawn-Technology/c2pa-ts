@@ -1,11 +1,4 @@
-import {
-    calculatePaddingSize,
-    createPadding,
-    IdentityAssertionValidationOptions,
-    serializeIdentityAssertion,
-    validateIcaCredential,
-    validateIdentityAssertion,
-} from '../../cawg';
+import { IdentityAssertionValidationOptions, validateIcaCredential, validateIdentityAssertion } from '../../cawg';
 import * as JUMBF from '../../jumbf';
 import { BinaryHelper } from '../../util';
 import { Claim } from '../Claim';
@@ -210,47 +203,5 @@ export class IdentityAssertion extends Assertion {
 
         this.pad1 = pad1;
         this.pad2 = pad2;
-    }
-
-    /**
-     * Create the final identity assertion after obtaining signature
-     *
-     * @param signerPayload - The signer_payload structure (must match what was signed)
-     * @param signature - The credential holder's signature over signer_payload
-     * @param placeholderSize - Optional size of placeholder assertion (if used)
-     * @returns Complete identity assertion structure
-     */
-    static createIdentityAssertion(
-        signerPayload: SignerPayloadMap,
-        signature: Uint8Array,
-        placeholderSize?: number,
-    ): IdentityAssertion {
-        // Create initial assertion without padding
-        const assertion = new IdentityAssertion();
-        assertion.signerPayload = signerPayload;
-        assertion.signature = signature;
-        assertion.pad1 = new Uint8Array(0);
-        assertion.pad2 = new Uint8Array(0);
-        // If placeholder size is specified, calculate padding
-        if (placeholderSize !== undefined) {
-            const currentSize = serializeIdentityAssertion(assertion).length;
-
-            if (currentSize > placeholderSize) {
-                throw new Error(
-                    `Signature size (${currentSize} bytes) exceeds placeholder size (${placeholderSize} bytes). ` +
-                        'Repeat claim generation with a larger placeholder.',
-                );
-            }
-
-            // Calculate padding to match placeholder size
-            const padding = calculatePaddingSize(currentSize, placeholderSize);
-            assertion.pad1 = createPadding(padding.pad1);
-
-            if (padding.pad2 > 0) {
-                assertion.pad2 = createPadding(padding.pad2);
-            }
-        }
-
-        return assertion;
     }
 }

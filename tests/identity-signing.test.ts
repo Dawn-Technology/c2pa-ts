@@ -72,12 +72,10 @@ function installDidResolverMock(issuerDid: string, publicJwk: JsonWebKey): () =>
 }
 
 async function createIcaCoseSign1(payload: Uint8Array, signer: Signer): Promise<Uint8Array> {
-    const protectedHeaderBytes = CBORBox.encoder.encode(
-        new Map<number, unknown>([
-            [1, signer.algorithm],
-            [3, 'application/vc'],
-        ]),
-    );
+    const protectedHeaderBytes = CBORBox.encoder.encode({
+        '1': signer.algorithm,
+        '3': 'application/vc',
+    });
 
     const toBeSigned = new SigStructure('Signature1', protectedHeaderBytes, payload).encode();
     const signature = await signer.sign(toBeSigned);
@@ -116,16 +114,16 @@ function adjustIdentityAssertionSize(
 
 // Location of the image to sign with identity assertion
 const sourceFile = 'tests/fixtures/dawn-technology-icon.jpg';
-const targetFile = 'tests/fixtures/dawn-technology-icon-signed-with-identity.jpg';
+const targetFile = 'tests/fixtures/dawn-technology-icon-signed-with-ica.jpg';
 
-describe('Identity Assertion Signing Tests', function () {
+describe('ICA (identity claims aggregation) Signing Tests', function () {
     for (const certificate of TEST_CERTIFICATES) {
         describe(`using ${certificate.name}`, function () {
             let manifest: Manifest | undefined;
             let issuerDid: string | undefined;
             let issuerPublicJwk: JsonWebKey | undefined;
 
-            it('add a manifest with identity assertion to a JPEG test file', async function () {
+            it('add a manifest with ICA (identity claims aggregation) to a JPEG test file', async function () {
                 const { signer, timestampProvider } = await loadTestCertificate(certificate);
 
                 // Load the file into a buffer
@@ -142,7 +140,7 @@ describe('Identity Assertion Signing Tests', function () {
                 const manifestStore = new ManifestStore();
                 manifest = manifestStore.createManifest({
                     assetFormat: 'image/jpeg',
-                    instanceID: 'identity-test-xyz',
+                    instanceID: 'ica-test-xyz',
                     defaultHashAlgorithm: 'SHA-256',
                     signer,
                 });
@@ -151,7 +149,7 @@ describe('Identity Assertion Signing Tests', function () {
                 const dataHashAssertion = DataHashAssertion.create('SHA-256');
                 manifest.addAssertion(dataHashAssertion);
 
-                // Create an identity assertion with placeholder values
+                // Create an ICA (identity claims aggregation) assertion with placeholder values
                 const identityAssertion = new IdentityAssertion();
                 // Set preliminary values with placeholder hash
                 identityAssertion.setSignerPayload(
@@ -161,20 +159,20 @@ describe('Identity Assertion Signing Tests', function () {
                             hash: new Uint8Array(32).fill(0x00),
                         },
                     ],
-                    SignatureType.X509Cose,
+                    SignatureType.IdentityClaimsAggregation,
                     ['cawg.creator'],
                 );
                 // Reserve enough space up-front for the real COSE_Sign1 ICA credential.
                 identityAssertion.setSignature(new Uint8Array(4096).fill(0xaa), new Uint8Array(256).fill(0x00));
 
-                // Add the identity assertion to the manifest
+                // Add the ICA (identity claims aggregation) assertion to the manifest
                 manifest.addAssertion(identityAssertion);
 
                 const reservedIdentityAssertionSize = identityAssertion
                     .generateJUMBFBox(manifest.claim)
                     .toBuffer(false).length;
 
-                // Make space in the asset for the manifest (now includes identity assertion)
+                // Make space in the asset for the manifest (now includes ICA assertion)
                 await asset.ensureManifestSpace(manifestStore.measureSize());
 
                 // Update the hard binding with the asset
@@ -193,7 +191,7 @@ describe('Identity Assertion Signing Tests', function () {
                 );
                 assert(hardBindingRef, 'Hard binding reference not found in claim assertions');
 
-                // Update the identity assertion with the correct hash
+                // Update the ICA (identity claims aggregation) assertion with the correct hash
                 identityAssertion.setSignerPayload(
                     [
                         {
@@ -201,7 +199,7 @@ describe('Identity Assertion Signing Tests', function () {
                             hash: hardBindingRef.hash,
                         },
                     ],
-                    SignatureType.X509Cose,
+                    SignatureType.IdentityClaimsAggregation,
                     ['cawg.creator'],
                 );
 
@@ -244,7 +242,61 @@ describe('Identity Assertion Signing Tests', function () {
                 await fs.writeFile(targetFile, await asset.getDataRange());
             });
 
-            it('read and verify the JPEG with identity assertion', async function () {
+            it('decode verifiedIdentities from the ICA credential in the signed JPEG', async function () {
+                if (!manifest) return;
+
+                const buf = await fs.readFile(targetFile).catch(() => undefined);
+                if (!buf) return;
+
+                const asset = await JPEG.create(buf);
+                const jumbf = await asset.getManifestJUMBF();
+                assert.ok(jumbf, 'no JUMBF found');
+
+                const superBox = SuperBox.fromBuffer(jumbf);
+                const manifestStore = ManifestStore.read(superBox);
+                const activeManifest = manifestStore.getActiveManifest();
+                assert.ok(activeManifest, 'no active manifest found');
+
+                const identityAssertion = activeManifest.assertions?.assertions.find(
+                    (a: Assertion) => a.label === 'cawg.identity',
+                );
+                assert.ok(identityAssertion instanceof IdentityAssertion, 'no IdentityAssertion found');
+
+                // Decode the COSE_Sign1 structure embedded in the assertion signature
+                const coseDecoded = CBORBox.decoder.decode(identityAssertion.signature) as {
+                    value: [Uint8Array, unknown, Uint8Array, Uint8Array];
+                };
+                assert.ok(Array.isArray(coseDecoded.value) && coseDecoded.value.length === 4, 'invalid COSE_Sign1');
+
+                // Payload is the JSON-encoded ICA credential
+                const [, , payloadBytes] = coseDecoded.value;
+                const credential = JSON.parse(new TextDecoder().decode(payloadBytes)) as {
+                    credentialSubject: {
+                        verifiedIdentities: {
+                            type: string;
+                            name?: string;
+                            username?: string;
+                            uri?: string;
+                            provider?: { id: string; name: string };
+                            verifiedAt: string;
+                        }[];
+                    };
+                };
+
+                const verifiedIdentities = credential.credentialSubject.verifiedIdentities;
+
+                assert.ok(
+                    Array.isArray(verifiedIdentities) && verifiedIdentities.length > 0,
+                    'verifiedIdentities is empty',
+                );
+                assert.equal(verifiedIdentities[0].type, 'cawg.social_media');
+                assert.equal(verifiedIdentities[0].name, 'Sample Creator');
+                assert.equal(verifiedIdentities[0].username, 'sample-creator');
+                assert.equal(verifiedIdentities[0].uri, 'https://example.com/sample-creator');
+                assert.equal(verifiedIdentities[0].provider?.name, 'Example Identity Provider');
+            });
+
+            it('read and verify the JPEG with ICA (identity claims aggregation) assertion', async function () {
                 if (!manifest) return;
 
                 // Load the file into a buffer
@@ -271,15 +323,15 @@ describe('Identity Assertion Signing Tests', function () {
                 const activeManifest = manifestStore.getActiveManifest();
                 assert.ok(activeManifest, 'no active manifest found');
 
-                // Find the identity assertion
+                // Find the ICA (identity claims aggregation) assertion
                 const identityAssertion = activeManifest.assertions?.assertions.find(
                     (a: Assertion) => a.label === 'cawg.identity',
                 );
-                assert.ok(identityAssertion, 'identity assertion not found');
+                assert.ok(identityAssertion, 'ICA (identity claims aggregation) assertion not found');
                 assert.ok(identityAssertion instanceof IdentityAssertion, 'assertion is not an IdentityAssertion');
 
-                // Verify identity assertion properties
-                assert.equal(identityAssertion.signerPayload.sig_type, SignatureType.X509Cose);
+                // Verify ICA (identity claims aggregation) assertion properties
+                assert.equal(identityAssertion.signerPayload.sig_type, SignatureType.IdentityClaimsAggregation);
                 assert.deepEqual(identityAssertion.signerPayload.role, ['cawg.creator']);
                 assert.equal(identityAssertion.signerPayload.referenced_assertions.length, 1);
 
@@ -292,19 +344,13 @@ describe('Identity Assertion Signing Tests', function () {
                 restoreDidResolver();
 
                 // Check overall validity
-                assert.ok(
-                    validationResult.isValid,
-                    `Validation result invalid: ${validationResult.statusEntries
-                        .filter(e => !e.success)
-                        .map(e => `${e.code}${e.explanation ? ` (${e.explanation})` : ''}`)
-                        .join(', ')}`,
-                );
+                assert.ok(validationResult.isValid, 'Validation result invalid');
 
-                // Verify identity assertion is present in the validation
+                // Verify ICA (identity claims aggregation) assertion is present in the validation
                 const identityHashCheck = validationResult.statusEntries.find(
                     e => e.code === ValidationStatusCode.AssertionHashedURIMatch && e.url?.includes('cawg.identity'),
                 );
-                assert.ok(identityHashCheck?.success, 'Identity assertion hash check failed');
+                assert.ok(identityHashCheck?.success, 'ICA (identity claims aggregation) assertion hash check failed');
             });
         });
     }

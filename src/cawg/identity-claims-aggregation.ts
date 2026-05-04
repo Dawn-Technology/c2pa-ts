@@ -21,77 +21,27 @@ import * as JUMBF from '../jumbf';
 import { ValidationResult, ValidationStatusCode } from '../manifest';
 import { BinaryHelper } from '../util';
 import { didResolver } from './did-resolver';
-import type {
-    C2paAssetBinding,
-    CredentialStatus,
-    DecodedCoseSign1,
-    DecodedCoseSign1Typing,
-    DIDPublicKey,
-    IdentityAssertionValidationOptions,
-    IdentityClaimsAggregationCredential,
-    IdentityClaimsCredentialSubject,
-    ProtectedHeaderMap,
-    SignerPayloadMap,
-    VerifiableCredential,
-    VerifiedIdentity,
+import {
+    SCHEMA_URL,
+    SUPPORTED_COSE_ALGORITHMS,
+    SUPPORTED_DID_METHODS,
+    SUPPORTED_VERIFICATION_METHODS,
+    VC_CONTEXT,
+    VC_TYPE,
+    type C2paAssetBinding,
+    type CredentialStatus,
+    type DecodedCoseSign1,
+    type DecodedCoseSign1Typing,
+    type DIDPublicKey,
+    type IdentityAssertionValidationOptions,
+    type IdentityClaimsAggregationCredential,
+    type IdentityClaimsCredentialSubject,
+    type ProtectedHeaderMap,
+    type SignerPayloadMap,
+    type VerifiableCredential,
+    type VerifiedIdentity,
 } from './types.js';
 import { c2paAssetBindingToSignerPayload, signerPayloadToC2paAssetBinding } from './utils.js';
-
-/**
- * W3C Verifiable Credentials contexts
- */
-export const VC_CONTEXT = {
-    /** VC Data Model v1.1 */
-    V1_1: 'https://www.w3.org/2018/credentials/v1',
-    /** VC Data Model v2.0 */
-    V2_0: 'https://www.w3.org/ns/credentials/v2',
-    /** CAWG Identity Claims Aggregation context */
-    CAWG: 'https://cawg.io/identity/1.1/ica/context/',
-} as const;
-
-/**
- * VC Types
- */
-export const VC_TYPE = {
-    Verifiable: 'VerifiableCredential',
-    IdentityClaimsAggregation: 'IdentityClaimsAggregationCredential',
-} as const;
-
-/**
- * Schema URLs
- */
-export const SCHEMA_URL = {
-    VC1_1: 'https://cawg.io/identity/1.1/ica/schema/vc1.1/',
-    VC2_0: 'https://cawg.io/identity/1.1/ica/schema/vc2.0/',
-} as const;
-
-/**
- * Supported DID methods
- */
-export const SUPPORTED_DID_METHODS = ['did:web', 'did:key', 'did:ion', 'did:jwk'] as const;
-
-/**
- * Supported DID verification methods
- */
-export const SUPPORTED_VERIFICATION_METHODS = [
-    'JsonWebKey',
-    'JsonWebKey2020',
-    'Ed25519VerificationKey2020',
-    'EcdsaSecp256k1VerificationKey2019',
-] as const;
-
-/**
- * Supported COSE algorithms for ICA
- */
-export const SUPPORTED_COSE_ALGORITHMS = {
-    ES256: -7, // ECDSA with SHA-256
-    ES384: -35, // ECDSA with SHA-384
-    ES512: -36, // ECDSA with SHA-512
-    PS256: -37, // RSASSA-PSS with SHA-256
-    PS384: -38, // RSASSA-PSS with SHA-384
-    PS512: -39, // RSASSA-PSS with SHA-512
-    EdDSA: -8, // EdDSA (Ed25519 only)
-} as const;
 
 /**
  * Create an Identity Claims Aggregation credential
@@ -154,34 +104,6 @@ export function createIcaCredential(
     }
 
     return credential;
-}
-
-/**
- * Sign an ICA credential using COSE
- *
- * Per CAWG spec Section 8.1.4, the credential must be secured using
- * COSE as described in W3C "Securing Verifiable Credentials using JOSE and COSE"
- *
- * @param credential - Unsigned credential
- * @param signCallback - Function that creates COSE_Sign1 signature
- * @returns COSE_Sign1 signature bytes (the complete identity assertion signature)
- */
-export async function signIcaCredential(
-    credential: IdentityClaimsAggregationCredential,
-    signCallback: (payload: Uint8Array) => Promise<Uint8Array>,
-): Promise<Uint8Array> {
-    // Serialize credential as JSON
-    const credentialJson = JSON.stringify(credential);
-    const credentialBytes = new TextEncoder().encode(credentialJson);
-
-    // Sign using COSE_Sign1
-    // The callback should create a COSE_Sign1 structure with:
-    // - Protected header: { alg: <algorithm>, content type: "application/vc" }
-    // - Unprotected header: optional timestamp in sigTst2
-    // - Payload: credentialBytes (unencoded)
-    const coseSign1 = await signCallback(credentialBytes);
-
-    return coseSign1;
 }
 
 /**

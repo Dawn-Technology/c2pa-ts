@@ -7,7 +7,6 @@ import { SuperBox } from '../../src/jumbf';
 import { ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
 import { BinaryHelper } from '../../src/util';
 
-
 const baseDir = 'tests/fixtures/identity/image';
 
 interface TestIdentityExpectations {

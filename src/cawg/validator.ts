@@ -5,7 +5,6 @@
  * @module cawg/validator
  */
 
-import { Crypto, HashAlgorithm } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
@@ -18,6 +17,9 @@ import {
     type SignerPayloadMap,
 } from './types.js';
 import {
+    arrayEquals,
+    computeHash,
+    deepEqual,
     extractAssertionLabel,
     findDuplicateReferences,
     hashMapsEqual,
@@ -313,7 +315,7 @@ async function validateExpectedCountersigners(
 ): Promise<ValidationResult> {
     const result = new ValidationResult();
 
-    // Find all other identity assertions in the manifest
+    // TODO Find all other identity assertions in the manifest
     const otherIdentityAssertions = findIdentityAssertions(sourceBox, assertionLabel);
 
     for (const otherAssertion of otherIdentityAssertions) {
@@ -335,6 +337,7 @@ async function validateExpectedCountersigners(
 
         // If expected_credentials is present, validate it
         if (matchingEntry.expected_credentials) {
+            // TODO
             const credentialMatch = await validateCountersignerCredentials(
                 otherAssertion,
                 matchingEntry.expected_credentials,
@@ -379,7 +382,7 @@ function replaceAssertionHash(claimData: Claim, label: string): void {
  * Helper: Extract claim generator certificate
  */
 function extractClaimGeneratorCertificate(claimData: JUMBF.SuperBox): Uint8Array | null {
-    // Extract from claim signature structure
+    // TODO Extract from claim signature structure
     return null;
 }
 
@@ -387,7 +390,7 @@ function extractClaimGeneratorCertificate(claimData: JUMBF.SuperBox): Uint8Array
  * Helper: Find other identity assertions in claim
  */
 function findIdentityAssertions(claimData: JUMBF.SuperBox, excludeLabel: string): IdentityAssertion[] {
-    // Implementation would find all identity assertions
+    // TODO  Implementation would find all identity assertions
     // except the one with excludeLabel
     return [];
 }
@@ -396,43 +399,9 @@ function findIdentityAssertions(claimData: JUMBF.SuperBox, excludeLabel: string)
  * Helper: Validate countersigner credentials
  */
 async function validateCountersignerCredentials(assertion: Assertion, expectedCredentials: HashMap): Promise<boolean> {
-    // Extract and hash credentials from assertion
+    // TODO Extract and hash credentials from assertion
     // Implementation depends on credential type
     return true; // Simplified
-}
-
-/**
- * Helper: Compute cryptographic hash
- */
-async function computeHash(data: Uint8Array, algorithm: string): Promise<Uint8Array> {
-    const algorithmMap: Record<string, HashAlgorithm> = {
-        sha256: 'SHA-256',
-        sha384: 'SHA-384',
-        sha512: 'SHA-512',
-    };
-
-    const webCryptoAlg = algorithmMap[algorithm.toLowerCase()];
-    if (!webCryptoAlg) {
-        throw new Error(`Unsupported hash algorithm: ${algorithm}`);
-    }
-
-    const hashBuffer = await Crypto.digest(data, webCryptoAlg);
-    return new Uint8Array(hashBuffer);
-}
-
-/**
- * Helper: Compare two byte arrays
- */
-function arrayEquals(a: Uint8Array, b: Uint8Array): boolean {
-    if (a.length !== b.length) return false;
-    return a.every((byte, i) => byte === b[i]);
-}
-
-/**
- * Helper: Deep equality check
- */
-function deepEqual(a: unknown, b: unknown): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /**

@@ -4,8 +4,8 @@
  *
  * @module cawg/utils
  */
-
 import * as cborX from 'cbor-x';
+import { Crypto, HashAlgorithm } from '../crypto';
 import { Claim, IdentityAssertion } from '../manifest/index.js';
 import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from './types.js';
 
@@ -320,4 +320,38 @@ export function isHardBindingAssertion(assertionLabel: string): boolean {
 export function extractAssertionLabel(jumbfUri: string): string | null {
     const match = /c2pa\.assertions\/([^/]+)$/.exec(jumbfUri);
     return match ? match[1] : null;
+}
+
+/**
+ * Helper: Compute cryptographic hash
+ */
+export async function computeHash(data: Uint8Array, algorithm: string): Promise<Uint8Array> {
+    const algorithmMap: Record<string, HashAlgorithm> = {
+        sha256: 'SHA-256',
+        sha384: 'SHA-384',
+        sha512: 'SHA-512',
+    };
+
+    const webCryptoAlg = algorithmMap[algorithm.toLowerCase()];
+    if (!webCryptoAlg) {
+        throw new Error(`Unsupported hash algorithm: ${algorithm}`);
+    }
+
+    const hashBuffer = await Crypto.digest(data, webCryptoAlg);
+    return new Uint8Array(hashBuffer);
+}
+
+/**
+ * Helper: Compare two byte arrays
+ */
+export function arrayEquals(a: Uint8Array, b: Uint8Array): boolean {
+    if (a.length !== b.length) return false;
+    return a.every((byte, i) => byte === b[i]);
+}
+
+/**
+ * Helper: Deep equality check
+ */
+export function deepEqual(a: unknown, b: unknown): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
 }
