@@ -265,16 +265,16 @@ export enum TrustDecision {
  * Configuration for CAWG trust model
  */
 export interface CawgTrustConfiguration {
-    /** List of accepted Extended Key Usage (EKU) OID values */
-    acceptedEkus: string[];
-    /** For each EKU, list of accepted Certificate Policy OID values */
-    acceptedCertificatePolicies: Map<string, string[]>;
+    /** TODO List of accepted Extended Key Usage (EKU) OID values */
+    // acceptedEkus: string[];
+    /** TODO For each EKU, list of accepted Certificate Policy OID values */
+    // acceptedCertificatePolicies: Map<string, string[]>;
     /** List of X.509 certificate trust anchors */
     trustAnchors: (string | Uint8Array | X509Certificate)[];
-    /** List of trusted identity claims aggregator DIDs */
-    trustedIcaIssuers?: string[];
-    /** List of trusted identity claims aggregator trust anchors */
-    trustedIcaAnchors?: string[];
+    /** TODO List of trusted identity claims aggregator DIDs */
+    // trustedIcaIssuers?: string[];
+    /** TODO List of trusted identity claims aggregator trust anchors */
+    // trustedIcaAnchors?: string[];
     /** Whether to check credential revocation status */
     checkRevocation?: boolean;
     /** Current time for validation (defaults to now) */

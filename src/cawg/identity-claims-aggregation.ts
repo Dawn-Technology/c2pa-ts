@@ -403,7 +403,7 @@ function ed25519Base58ToJwk(publicKeyBase58: string): JsonWebKey {
 // cawg.ica.untrusted_issuer but MAY continue validation.
 // TODO
 async function verifyIssuerTrust(issuerDid: string, validationOptions?: CawgTrustConfiguration): Promise<boolean> {
-    // Mock
+    // TODO
     return true;
 }
 

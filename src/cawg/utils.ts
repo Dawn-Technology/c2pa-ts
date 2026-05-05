@@ -6,7 +6,7 @@
  */
 import * as cborX from 'cbor-x';
 import { Crypto, HashAlgorithm } from '../crypto';
-import { Claim, IdentityAssertion } from '../manifest/index.js';
+import { Claim } from '../manifest/index.js';
 import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from './types.js';
 
 /**
@@ -38,20 +38,6 @@ export function serializeClaimData(payload: Claim): Uint8Array {
  */
 export function deserializeClaimData(data: Uint8Array): Claim {
     return cborX.decode(data) as Claim;
-}
-
-/**
- * Serialize complete identity assertion to CBOR
- */
-export function serializeIdentityAssertion(assertion: IdentityAssertion): Uint8Array {
-    return cborX.encode(assertion);
-}
-
-/**
- * Deserialize CBOR-encoded identity assertion
- */
-export function deserializeIdentityAssertion(data: Uint8Array): IdentityAssertion {
-    return cborX.decode(data) as IdentityAssertion;
 }
 
 /**

@@ -1,12 +1,22 @@
 import * as JUMBF from '../jumbf';
-import { ActionAssertion, Assertion, BMFFHashAssertion, CreativeWorkAssertion, DataHashAssertion, IdentityAssertion, IngredientAssertion, MetadataAssertion, TrainingAndDataMiningAssertion, UnknownAssertion } from './assertions';
+import {
+    ActionAssertion,
+    Assertion,
+    BMFFHashAssertion,
+    CreativeWorkAssertion,
+    DataHashAssertion,
+    IdentityAssertion,
+    IngredientAssertion,
+    MetadataAssertion,
+    TrainingAndDataMiningAssertion,
+    UnknownAssertion,
+} from './assertions';
 import { AssertionLabels } from './assertions/AssertionLabels';
 import { ThumbnailAssertion } from './assertions/ThumbnailAssertion';
 import { Claim } from './Claim';
 import * as raw from './rawTypes';
 import { ManifestComponent, RelationshipType, ValidationStatusCode } from './types';
 import { ValidationError } from './ValidationError';
-
 
 export class AssertionStore implements ManifestComponent {
     public readonly label: string = 'c2pa.assertions';
@@ -127,7 +137,6 @@ export class AssertionStore implements ManifestComponent {
      * @returns Array of assertions matching the label
      */
     public getAssertionsByLabel(label: string) {
-        // TODO: Consider normalizing labels to not include the 'self#jumbf=c2pa.assertions/' prefix in the future to simplify this lookup, but for now support both formats for compatibility with existing manifests
         return this.assertions.filter(assertion => assertion.label === label);
     }
 
