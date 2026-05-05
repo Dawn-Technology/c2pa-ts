@@ -177,7 +177,7 @@ export class AssertionStore implements ManifestComponent {
      * Gets all identity assertions from the store
      * @returns Array of IdentityAssertion objects
      */
-    public getIdentityAssertions() {
+    public getIdentityAssertions(): IdentityAssertion[] {
         return this.assertions.filter(assertion => assertion instanceof IdentityAssertion);
     }
 }

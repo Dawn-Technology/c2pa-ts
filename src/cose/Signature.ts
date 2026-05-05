@@ -12,6 +12,7 @@ import {
 } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
+import { CawgValidationOptions } from '../cawg';
 import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
@@ -21,6 +22,7 @@ import { BinaryHelper, MalformedContentError } from '../util';
 import { Algorithms, CoseAlgorithm } from './Algorithms';
 import { Signer } from './Signer';
 import { SigStructure } from './SigStructure';
+import { TrustList } from './TrustList';
 import {
     AdditionalEKU,
     CoseSignature,
@@ -30,6 +32,18 @@ import {
     TstContainer,
     UnprotectedBucket,
 } from './types';
+
+/**
+ * Options for signature validation.
+ */
+export interface ValidationOptions {
+    /**
+     * Trust anchors (root certificates) to use for chain validation.
+     * Accepts PEM strings, DER bytes, or X509Certificate instances.
+     * If not provided, defaults to TrustList.trustAnchors for backwards compatibility.
+     */
+    trustAnchors?: (string | Uint8Array | X509Certificate)[];
+}
 
 export class Signature {
     public algorithm?: CoseAlgorithm;
@@ -41,6 +55,7 @@ export class Signature {
     public paddingLength = 0;
 
     private validatedTimestamp: Date | undefined;
+
     /**
      * Gets the validated timestamp or falls back to unverified timestamp
      * @returns Date object representing the timestamp, or undefined if no timestamp exists
@@ -101,6 +116,8 @@ export class Signature {
                 signature.chainCertificates = x5chain
                     .slice(1)
                     .map(c => new X509Certificate(c as Uint8Array<ArrayBuffer>));
+            } else {
+                signature.chainCertificates = [];
             }
         } catch {
             throw new MalformedContentError('Malformed credentials');
@@ -281,7 +298,7 @@ export class Signature {
                 for (const cert of signedData.certificates ?? []) {
                     if (!(cert instanceof pkijs.Certificate)) continue;
                     const x509Cert = new X509Certificate(cert.toSchema().toBER());
-                    const certValidation = Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
+                    const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
                     if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
                         result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
                         continue;
@@ -433,9 +450,14 @@ export class Signature {
      * Validates the signature against a payload
      * @param payload - The payload to validate against
      * @param sourceBox - Optional JUMBF box for error context
+     * @param validationOptions - Optional validation options including trust anchors
      * @returns Promise resolving to ValidationResult
      */
-    public async validate(payload: Uint8Array, sourceBox?: JUMBF.IBox): Promise<ValidationResult> {
+    public async validate(
+        payload: Uint8Array,
+        sourceBox?: JUMBF.IBox,
+        validationOptions?: CawgValidationOptions,
+    ): Promise<ValidationResult> {
         if (!this.certificate || !this.rawProtectedBucket || !this.signature || !this.algorithm) {
             return ValidationResult.error(ValidationStatusCode.SigningCredentialInvalid, sourceBox);
         }
@@ -445,12 +467,15 @@ export class Signature {
         result.merge(await this.validateTimestamp(payload, CBORBox.encoder.encode(this.signature), sourceBox));
         const timestamp = this.validatedTimestamp ?? new Date();
 
-        let code = Signature.validateCertificate(this.certificate, timestamp, true);
+        // Parse trust anchors from options or fall back to global TrustList for backwards compatibility
+        const trustAnchors =
+            validationOptions?.trustAnchors ?
+                TrustList.parseTrustAnchors(validationOptions.trustAnchors)
+            :   TrustList.trustAnchors;
+
+        let code = await Signature.validateCertificate(this.certificate, timestamp, true);
         if (code === ValidationStatusCode.SigningCredentialTrusted) {
-            for (const chainCertificate of this.chainCertificates) {
-                code = Signature.validateCertificate(chainCertificate, timestamp, false);
-                if (code !== ValidationStatusCode.SigningCredentialTrusted) break;
-            }
+            code = await Signature.validateChain(this.certificate, timestamp, this.chainCertificates, trustAnchors);
         }
         if (code === ValidationStatusCode.SigningCredentialTrusted) result.addInformational(code, sourceBox);
         else result.addError(code, sourceBox);
@@ -477,13 +502,11 @@ export class Signature {
         return result;
     }
 
-    private static validateCertificate(
+    private static async validateCertificate(
         certificate: X509Certificate,
         validityTimestamp: Date,
         isUsedForManifestSigning: boolean,
-    ): ValidationStatusCode {
-        // TODO Actually verify the certificate chain
-
+    ): Promise<ValidationStatusCode> {
         const rawCertificate = AsnConvert.parse(certificate.rawData, ASN1Certificate).tbsCertificate;
 
         // TODO verify OCSP
@@ -617,5 +640,121 @@ export class Signature {
         // creation/validation as there aren't any matching allowed COSE algorithms
 
         return undefined;
+    }
+
+    private static keyIdsMatch(cert: X509Certificate, issuer: X509Certificate): boolean {
+        const aki = cert.getExtension(AuthorityKeyIdentifierExtension)?.keyId;
+        const ski = issuer.getExtension(SubjectKeyIdentifierExtension)?.keyId;
+        if (!aki || !ski) return false;
+
+        return aki === ski;
+    }
+
+    private static async verifySignature(cert: X509Certificate, issuer: X509Certificate): Promise<boolean> {
+        return cert.verify({
+            publicKey: issuer.publicKey,
+        });
+    }
+
+    /**
+     * Validates a certificate chain from a leaf certificate to a trusted root.
+     * Traverses the certificate chain by finding issuers in the intermediates list,
+     * validating each certificate's signature and timestamp. Returns a status indicating
+     * whether the chain terminates in a trusted root certificate.
+     * @param leaf - The leaf certificate to validate
+     * @param timestamp - The timestamp to validate certificates against
+     * @param intermediates - Array of intermediate certificates to use for chain building
+     * @param trustedRoots - Array of trusted root certificates
+     * @returns Promise resolving to a ValidationStatusCode indicating if the chain is trusted
+     * @throws Does not throw; errors are returned as validation status codes
+     */
+    private static async validateChain(
+        leaf: X509Certificate,
+        timestamp: Date,
+        intermediates: X509Certificate[],
+        trustedRoots: X509Certificate[],
+    ): Promise<ValidationStatusCode> {
+        let current = leaf;
+        const seen = new Set<X509Certificate>();
+
+        const trustedRootThumbprints = await Promise.all(
+            trustedRoots.map(async r => {
+                return await r.getThumbprint();
+            }),
+        );
+        while (true) {
+            // Check if current certificate is directly trusted
+            const currentThumbprint = await current.getThumbprint();
+            const found = trustedRootThumbprints.find(trustedRootThumbprint =>
+                BinaryHelper.bufEqual(new Uint8Array(trustedRootThumbprint), new Uint8Array(currentThumbprint)),
+            );
+            if (found) {
+                return ValidationStatusCode.SigningCredentialTrusted;
+            }
+
+            // Find a trusted root that directly signed the current certificate to avoid unnecessary chain building and signature checks
+            let foundTrustedRoot = undefined;
+            for (const trustedRoot of trustedRoots) {
+                if (await Signature.validateChainCertificate(current, trustedRoot, timestamp)) {
+                    foundTrustedRoot = trustedRoot;
+                    break;
+                }
+            }
+            if (foundTrustedRoot) {
+                return ValidationStatusCode.SigningCredentialTrusted;
+            }
+
+            // Search issuer in intermediates
+            const issuer = (intermediates || []).find(intermediate => {
+                return Signature.keyIdsMatch(current, intermediate);
+            });
+
+            if (!issuer) {
+                return ValidationStatusCode.SigningCredentialUntrusted;
+            }
+
+            // Signature check and validate certificate and timestamp for the issuer
+            if (!(await Signature.validateChainCertificate(current, issuer, timestamp))) {
+                return ValidationStatusCode.SigningCredentialUntrusted;
+            }
+
+            // Loop detection
+            if (seen.has(issuer)) {
+                return ValidationStatusCode.SigningCredentialUntrusted;
+            }
+            seen.add(issuer);
+            current = issuer;
+        }
+    }
+
+    /**
+     * Validates a certificate chain by verifying the signature and certificate validity.
+     * @param current - The current certificate in the chain to be validated
+     * @param issuer - The issuer certificate used to verify the current certificate's signature
+     * @param timestamp - The timestamp at which the certificate should be valid
+     * @returns A promise that resolves to `true` if both the signature verification and certificate validation succeed, `false` otherwise
+     * This method performs two validations:
+     * 1. Verifies that the current certificate is properly signed by the issuer certificate
+     * 2. Validates that the issuer certificate is trusted and valid at the given timestamp
+     * Both validations must pass for the method to return `true`.
+     */
+    private static async validateChainCertificate(
+        current: X509Certificate,
+        issuer: X509Certificate,
+        timestamp: Date,
+    ): Promise<boolean> {
+        // Signature check
+        const verifySignature = await this.verifySignature(current, issuer);
+        if (!verifySignature) {
+            return false;
+        }
+
+        // Validate certificate and timestamp for the issuer
+        const validateCertificate = await Signature.validateCertificate(issuer, timestamp, false);
+        if (validateCertificate !== ValidationStatusCode.SigningCredentialTrusted) {
+            return false;
+        }
+
+        return true;
     }
 }

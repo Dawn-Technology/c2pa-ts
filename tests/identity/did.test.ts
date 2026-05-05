@@ -23,7 +23,7 @@ interface DidFixture {
     sign: (payload: Uint8Array) => Promise<Uint8Array>;
 }
 
-const STEP5_ERROR_CODES = [
+const DID_ERROR_CODES = [
     ValidationStatusCode.IcaInvalidIssuer,
     ValidationStatusCode.IcaDidUnsupportedMethod,
     ValidationStatusCode.IcaDidUnavailable,
@@ -160,7 +160,7 @@ async function createFixture(method: SupportedDidMethod): Promise<DidFixture> {
 function installDidResolverMock(issuerDid: string, didDocument: DIDDocument): () => void {
     const originalResolve = didResolver.resolve.bind(didResolver);
 
-    didResolver.resolve = (async (did: string) => {
+    didResolver.resolve = async (did: string) => {
         if (did !== issuerDid) {
             return originalResolve(did);
         }
@@ -170,7 +170,7 @@ function installDidResolverMock(issuerDid: string, didDocument: DIDDocument): ()
             didResolutionMetadata: {},
             didDocumentMetadata: {},
         };
-    }) as typeof didResolver.resolve;
+    };
 
     return () => {
         didResolver.resolve = originalResolve;
@@ -268,8 +268,8 @@ describe('DID validation', () => {
                 ]);
                 const errors = failedCodes(result);
 
-                for (const code of STEP5_ERROR_CODES) {
-                    assert.ok(!errors.includes(code), `unexpected Step 5 failure code: ${code}`);
+                for (const code of DID_ERROR_CODES) {
+                    assert.ok(!errors.includes(code), `unexpected failure code: ${code}`);
                 }
 
                 assert.ok(!errors.includes(ValidationStatusCode.IcaSignatureMismatch));
@@ -310,13 +310,13 @@ describe('DID validation', () => {
                 ]);
                 const errors = failedCodes(result);
 
-                for (const code of STEP5_ERROR_CODES) {
-                    assert.ok(!errors.includes(code), `unexpected Step 5 failure code: ${code}`);
+                for (const code of DID_ERROR_CODES) {
+                    assert.ok(!errors.includes(code), `unexpected failure code: ${code}`);
                 }
 
                 assert.ok(
                     errors.includes(ValidationStatusCode.IcaSignatureMismatch),
-                    `expected Step 7 signature mismatch, got: ${errors.join(', ')}`,
+                    `expected signature mismatch, got: ${errors.join(', ')}`,
                 );
             } finally {
                 restoreDidResolver();

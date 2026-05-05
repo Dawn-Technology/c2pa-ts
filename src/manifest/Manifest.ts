@@ -1,12 +1,12 @@
 import { Asset } from '../asset';
-import { IdentityAssertionValidationOptions } from '../cawg';
+import { CawgValidationOptions } from '../cawg';
 import { Signer } from '../cose';
 import { HashAlgorithm } from '../crypto';
 import { Crypto } from '../crypto/Crypto';
 import * as JUMBF from '../jumbf';
 import { TimestampProvider } from '../rfc3161';
 import { BinaryHelper, MalformedContentError } from '../util';
-import { ActionAssertion, Assertion, AssertionLabels, IngredientAssertion } from './assertions';
+import { ActionAssertion, Assertion, AssertionLabels, IdentityAssertion, IngredientAssertion } from './assertions';
 import { AssertionStore } from './AssertionStore';
 import { Claim } from './Claim';
 import { ManifestStore } from './ManifestStore';
@@ -248,10 +248,10 @@ export class Manifest implements ManifestComponent {
     /**
      * Verifies the manifest's claim's validity
      * @param asset - Asset for validation of bindings
-     * @param options - Validation options
+     * @param validationOptions - Validation options
      * @returns Promise resolving to ValidationResult
      */
-    public async validate(asset: Asset, options?: IdentityAssertionValidationOptions): Promise<ValidationResult> {
+    public async validate(asset: Asset, validationOptions?: CawgValidationOptions): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         if (!this.claim?.sourceBox) {
@@ -262,7 +262,7 @@ export class Manifest implements ManifestComponent {
         // Validate the signature
         const referencedSignature = this.getComponentByURL(this.claim?.signatureRef, true);
         if (this.signature && referencedSignature === this.signature) {
-            result.merge(await this.signature.validate(this.claim.getBytes(this.claim)!));
+            result.merge(await this.signature.validate(this.claim.getBytes(this.claim)!, validationOptions));
         } else {
             result.addError(ValidationStatusCode.ClaimSignatureMissing, this.claim.signatureRef);
         }
@@ -321,7 +321,7 @@ export class Manifest implements ManifestComponent {
         result.merge(await this.validateIngredients());
 
         // TODO: Move to correct location in multistep validation process
-        result.merge(await this.validateIdentityAssertions(options));
+        result.merge(await this.validateIdentityAssertions(validationOptions));
 
         return result;
     }
@@ -620,16 +620,16 @@ export class Manifest implements ManifestComponent {
 
     /**
      * Validates identity assertions on a manifest
-     * @param options - Validation options
+     * @param validationOptions - Validation options
      * @returns ValidationResult containing any validation errors or successes
      */
-    private async validateIdentityAssertions(options?: IdentityAssertionValidationOptions): Promise<ValidationResult> {
+    private async validateIdentityAssertions(validationOptions?: CawgValidationOptions): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         // Check for identity  assertions
-        const identityAssertions = this.assertions?.getIdentityAssertions() ?? [];
+        const identityAssertions: IdentityAssertion[] = this.assertions?.getIdentityAssertions() ?? [];
         for (const assertion of identityAssertions) {
-            result.merge(await assertion.validate(this, options));
+            result.merge(await assertion.validate(this, validationOptions));
         }
         return result;
     }

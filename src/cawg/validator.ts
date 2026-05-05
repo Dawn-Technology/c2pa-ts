@@ -13,7 +13,7 @@ import {
     type ExpectedCountersignerMap,
     type HashedUriMap,
     type HashMap,
-    type IdentityAssertionValidationOptions,
+    type CawgValidationOptions,
     type SignerPayloadMap,
 } from './types.js';
 import {
@@ -46,7 +46,7 @@ export async function validateIdentityAssertion(
     assertion: IdentityAssertion,
     assertionLabel: string,
     sourceBox: JUMBF.SuperBox,
-    options: IdentityAssertionValidationOptions = {},
+    options: CawgValidationOptions = {},
 ): Promise<ValidationResult> {
     const result: ValidationResult = new ValidationResult();
 

@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
-import { describe, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { Asset, AssetType, JPEG } from '../../src/asset';
-import { IdentityAssertionValidationOptions } from '../../src/cawg';
+import { CawgValidationOptions } from '../../src/cawg';
 import { SuperBox } from '../../src/jumbf';
 import { ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
 import { BinaryHelper } from '../../src/util';
+import { setTrustList } from '../utils/set-trust-list';
 
 const baseDir = 'tests/fixtures/identity/image';
 
@@ -33,7 +34,7 @@ interface TestIdentityExpectations {
     /**
      * Validation options to use when validating the asset
      */
-    options?: IdentityAssertionValidationOptions;
+    options?: CawgValidationOptions;
 }
 
 // test data sets with file names and expected outcomes
@@ -232,6 +233,10 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         ],
     },
 };
+
+beforeAll(async () => {
+    await setTrustList();
+});
 
 describe('Functional Identity Asset Reading Tests', function () {
     for (const [filename, data] of Object.entries(testIdentityFiles)) {

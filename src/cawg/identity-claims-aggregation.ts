@@ -8,7 +8,7 @@
 import * as asn1js from 'asn1js';
 import { DIDDocument, VerificationMethod } from 'did-resolver';
 import * as pkijs from 'pkijs';
-import { Algorithms, CoseAlgorithmIdentifier } from '../cose';
+import { Algorithms } from '../cose';
 import { SigStructure } from '../cose/SigStructure';
 import { Crypto } from '../crypto';
 import type {
@@ -29,11 +29,11 @@ import {
     VC_CONTEXT,
     VC_TYPE,
     type C2paAssetBinding,
+    type CawgValidationOptions,
     type CredentialStatus,
     type DecodedCoseSign1,
     type DecodedCoseSign1Typing,
     type DIDPublicKey,
-    type IdentityAssertionValidationOptions,
     type IdentityClaimsAggregationCredential,
     type IdentityClaimsCredentialSubject,
     type ProtectedHeaderMap,
@@ -123,7 +123,7 @@ export async function validateIcaCredential(
     signerPayload: SignerPayloadMap,
     assertionLabel: string,
     trustedIssuers: string[],
-    options?: IdentityAssertionValidationOptions,
+    options?: CawgValidationOptions,
 ): Promise<ValidationResult> {
     const result: ValidationResult = new ValidationResult();
 
@@ -424,7 +424,7 @@ async function verifyCoseSign1(coseSign1: DecodedCoseSign1, publicKey: DIDPublic
         }
 
         // Get the COSE algorithm
-        const coseAlgorithm = Algorithms.getAlgorithm(coseSign1.protectedHeader.alg as CoseAlgorithmIdentifier);
+        const coseAlgorithm = Algorithms.getAlgorithm(coseSign1.protectedHeader.alg);
         if (!coseAlgorithm) {
             return false;
         }
@@ -531,7 +531,7 @@ function buildSigningAlgorithm(
 
     // For non-ECDSA algorithms, return as-is (they already have all required properties)
     if (coseAlg.name !== 'ECDSA') {
-        return coseAlg as SigningAlgorithm;
+        return coseAlg;
     }
 
     return null;
@@ -580,22 +580,21 @@ function getAlgorithmFromJwk(jwk: JsonWebKey): Algorithm | null {
 
         return {
             name: 'ECDSA',
-            namedCurve,
-        } as EcKeyImportParams;
+        };
     }
 
     // Handle RSA keys
     if (jwk.kty === 'RSA') {
         return {
             name: 'RSASSA-PKCS1-v1_5',
-        } as RsaHashedImportParams;
+        };
     }
 
     // Handle OKP (Octet Key Pair) keys used for EdDSA/Ed25519
     if (jwk.kty === 'OKP' && jwk.crv === 'Ed25519') {
         return {
             name: 'Ed25519',
-        } as Algorithm;
+        };
     }
 
     return null;

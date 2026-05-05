@@ -5,6 +5,9 @@
  * @module cawg/types
  */
 
+import { X509Certificate } from '@peculiar/x509';
+import { ValidationOptions } from '../cose';
+
 /**
  * Hash algorithm and value map used in various CAWG structures
  */
@@ -267,7 +270,23 @@ export interface CawgTrustConfiguration {
     /** For each EKU, list of accepted Certificate Policy OID values */
     acceptedCertificatePolicies: Map<string, string[]>;
     /** List of X.509 certificate trust anchors */
-    trustAnchors: Uint8Array[];
+    trustAnchors: (string | Uint8Array | X509Certificate)[];
+}
+
+/**
+ * Options for validating an identity assertion
+ */
+export interface CawgValidationOptions extends ValidationOptions {
+    /** Trust configuration for X.509 certificates */
+    trustConfiguration?: CawgTrustConfiguration;
+    /** List of trusted identity claims aggregator DIDs */
+    trustedIcaIssuers?: string[];
+    /** List of trusted identity claims aggregator trust anchors */
+    trustedIcaAnchors?: string[];
+    /** Whether to check credential revocation status */
+    checkRevocation?: boolean;
+    /** Current time for validation (defaults to now) */
+    validationTime?: Date;
 }
 
 /**
@@ -288,22 +307,6 @@ export interface IdentityAssertionCreationOptions {
     expectedCountersigners?: ExpectedCountersignerMap[];
     /** Reserved space size for signature (for placeholder assertions) */
     reservedSignatureSize?: number;
-}
-
-/**
- * Options for validating an identity assertion
- */
-export interface IdentityAssertionValidationOptions {
-    /** Trust configuration for X.509 certificates */
-    trustConfiguration?: CawgTrustConfiguration;
-    /** List of trusted identity claims aggregator DIDs */
-    trustedIcaIssuers?: string[];
-    /** List of trusted identity claims aggregator trust anchors */
-    trustedIcaAnchors?: string[];
-    /** Whether to check credential revocation status */
-    checkRevocation?: boolean;
-    /** Current time for validation (defaults to now) */
-    validationTime?: Date;
 }
 
 /**
