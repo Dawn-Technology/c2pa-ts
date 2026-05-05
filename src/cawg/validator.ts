@@ -143,13 +143,38 @@ async function validateReferencedAssertions(
     const result = new ValidationResult();
 
     for (const ref of references) {
+        const claimAssertion = manifest.claim?.assertions?.find(assertion => assertion.uri === ref.url);
+
+        if (!claimAssertion) {
+            result.addError(
+                ValidationStatusCode.IdentityAssertionMismatch,
+                sourceBox,
+                `Referenced assertion not found in claim: ${ref.url}`,
+            );
+            continue;
+        }
+
+        if (
+            !hashMapsEqual(
+                { hash: ref.hash, alg: '' },
+                { hash: claimAssertion.hash, alg: '' },
+            )
+        ) {
+            result.addError(
+                ValidationStatusCode.IdentityAssertionMismatch,
+                sourceBox,
+                `Referenced assertion hash does not match claim entry: ${ref.url}`,
+            );
+            continue;
+        }
+
         const found = manifest.assertions?.getAssertionsByLabel(extractAssertionLabel(ref.url) ?? '');
 
         if (!found || found.length === 0) {
             result.addError(
                 ValidationStatusCode.IdentityAssertionMismatch,
                 sourceBox,
-                `Referenced assertion not found in claim: ${ref.url}`,
+                `Referenced assertion object not found for claim entry: ${ref.url}`,
             );
         }
     }
