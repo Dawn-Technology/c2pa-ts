@@ -678,12 +678,12 @@ export class Signature {
 
         const trustedRootThumbprints = await Promise.all(
             trustedRoots.map(async r => {
-                return await r.publicKey.getThumbprint();
+                return await r.getThumbprint();
             }),
         );
         while (true) {
             // Check if current certificate is directly trusted
-            const currentThumbprint = await current.publicKey.getThumbprint();
+            const currentThumbprint = await current.getThumbprint();
             const found = trustedRootThumbprints.find(trustedRootThumbprint =>
                 BinaryHelper.bufEqual(new Uint8Array(trustedRootThumbprint), new Uint8Array(currentThumbprint)),
             );

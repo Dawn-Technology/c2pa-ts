@@ -1039,7 +1039,7 @@ describe('Certificate Chain Validation', () => {
     });
 
     describe('8. Error Handling', () => {
-        it('should handle malformed certificate data', () => {
+        it('should handle malformed certificate data', async () => {
             expect(async () => {
                 new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
                     intermediateCert,

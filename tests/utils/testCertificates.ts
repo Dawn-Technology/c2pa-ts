@@ -50,7 +50,7 @@ export async function loadTestCertificate(certificateInfo: TestCertificate): Pro
 
     const signer = new LocalSigner(privateKey, certificateInfo.algorithm, x509Certificate);
 
-    // Set trust list if provided
+    // Set trust list
     await setTrustList(certificateInfo.trustListFile);
     return { signer, timestampProvider };
 }
@@ -148,8 +148,6 @@ export function getExpectedValidationStatusEntriesUntrusted(manifestLabel: strin
         },
     ];
 }
-
-
 
 export function getExpectedValidationStatusEntriesWrongTimeStamp(manifestLabel: string | undefined) {
     return [
