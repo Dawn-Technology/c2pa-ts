@@ -1045,7 +1045,7 @@ describe('Certificate Chain Validation', () => {
                     intermediateCert,
                     new X509Certificate(new Uint8Array([1, 2, 3, 4])),
                 ]);
-            }).toThrow();
+            }).rejects.toThrow();
         });
 
         it('should handle empty certificate data', async () => {
@@ -1054,7 +1054,7 @@ describe('Certificate Chain Validation', () => {
                     intermediateCert,
                     new X509Certificate(new Uint8Array([])),
                 ]);
-            }).toThrow();
+            }).rejects.toThrow();
         });
     });
 
