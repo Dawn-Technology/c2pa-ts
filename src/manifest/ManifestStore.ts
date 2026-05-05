@@ -130,12 +130,12 @@ export class ManifestStore {
     /**
      * Validates the active manifest
      * @param asset Asset for validation of bindings
-     * @param options Optional validation options including trust anchors
+     * @param validationOptions Optional validation options including trust anchors
      */
-    public async validate(asset: Asset, options?: ValidationOptions): Promise<ValidationResult> {
+    public async validate(asset: Asset, validationOptions?: ValidationOptions): Promise<ValidationResult> {
         const activeManifest = this.getActiveManifest();
         if (activeManifest) {
-            return activeManifest.validate(asset, options);
+            return activeManifest.validate(asset, validationOptions);
         } else {
             return ValidationResult.error(ValidationStatusCode.ClaimCBORInvalid, this.sourceBox);
         }

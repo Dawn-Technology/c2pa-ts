@@ -62,7 +62,8 @@ export class TrustList {
         while ((match = pattern.exec(pem)) !== null) {
             const base64 = match[1].replace(/\r?\n|\s/g, '');
             try {
-                out.push(Uint8Array.fromBase64(base64));
+                const derBuffer = Buffer.from(base64, 'base64');
+                out.push(new Uint8Array(derBuffer));
             } catch {
                 /* ignore invalid blocks */
             }

@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { beforeAll, describe, it } from 'bun:test';
 import { Asset, AssetType, BMFF, JPEG, PNG } from '../src/asset';
+import { ValidationOptions } from '../src/cose';
 import { SuperBox } from '../src/jumbf';
 import { ManifestStore, ValidationResult, ValidationStatusCode } from '../src/manifest';
 import { BinaryHelper } from '../src/util';
-import { setTrustList } from './utils/set-trust-list';
+import { getTrustAnchors } from './utils/set-trust-list';
 
 const baseDir = 'tests/fixtures';
 
@@ -199,8 +200,10 @@ const testFiles: Record<string, TestExpectations> = {
     },
 };
 
+const validationOptions: ValidationOptions = {};
+
 beforeAll(async () => {
-    await setTrustList('tests/fixtures/trust-list-wrong.pem');
+    validationOptions.trustAnchors = await getTrustAnchors('tests/fixtures/trust-list-wrong.pem');
 });
 
 describe('Trust list tests', function () {
@@ -258,7 +261,7 @@ describe('Trust list tests', function () {
                     const manifests = ManifestStore.read(superBox);
 
                     // Validate the asset with the manifest
-                    validationResult = await manifests.validate(asset);
+                    validationResult = await manifests.validate(asset, validationOptions);
 
                     const message =
                         data.valid ?

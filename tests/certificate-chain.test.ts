@@ -352,7 +352,7 @@ async function createLeafCertificate(
 
 /**
  * Applies targeted modifications to an extensions array, allowing tests to
- * replace or remove individual extensions by index.
+ * replace or remove individual extensions
  *
  * - If the value for an index is an {@link Extension}, it **replaces** the
  *   extension at that position.
@@ -508,13 +508,7 @@ describe('Certificate Chain Validation', () => {
                     signingKey: wrongRootKeys.privateKey,
                     publicKey: intermediateKeys.publicKey,
                     signingAlgorithm: { name: 'ECDSA', hash: 'SHA-256' },
-                    extensions: [
-                        new BasicConstraintsExtension(false, 2, true),
-                        new ExtendedKeyUsageExtension([ExtendedKeyUsage.emailProtection], true),
-                        new KeyUsagesExtension(KeyUsageFlags.digitalSignature, true),
-                        await SubjectKeyIdentifierExtension.create(intermediateKeys.publicKey, false),
-                        await AuthorityKeyIdentifierExtension.create(wrongRootKeys.publicKey, false),
-                    ],
+                    extensions: intermediateCert.extensions,
                 },
                 crypto,
             );

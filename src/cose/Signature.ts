@@ -449,13 +449,13 @@ export class Signature {
      * Validates the signature against a payload
      * @param payload - The payload to validate against
      * @param sourceBox - Optional JUMBF box for error context
-     * @param options - Optional validation options including trust anchors
+     * @param validationOptions - Optional validation options including trust anchors
      * @returns Promise resolving to ValidationResult
      */
     public async validate(
         payload: Uint8Array,
         sourceBox?: JUMBF.IBox,
-        options?: ValidationOptions,
+        validationOptions?: ValidationOptions,
     ): Promise<ValidationResult> {
         if (!this.certificate || !this.rawProtectedBucket || !this.signature || !this.algorithm) {
             return ValidationResult.error(ValidationStatusCode.SigningCredentialInvalid, sourceBox);
@@ -468,7 +468,9 @@ export class Signature {
 
         // Parse trust anchors from options or fall back to global TrustList for backwards compatibility
         const trustAnchors =
-            options?.trustAnchors ? TrustList.parseTrustAnchors(options.trustAnchors) : TrustList.trustAnchors;
+            validationOptions?.trustAnchors ?
+                TrustList.parseTrustAnchors(validationOptions.trustAnchors)
+            :   TrustList.trustAnchors;
 
         let code = await Signature.validateCertificate(this.certificate, timestamp, true);
         if (code === ValidationStatusCode.SigningCredentialTrusted) {

@@ -247,10 +247,10 @@ export class Manifest implements ManifestComponent {
     /**
      * Verifies the manifest's claim's validity
      * @param asset - Asset for validation of bindings
-     * @param options - Optional validation options including trust anchors
+     * @param validationOptions - Optional validation options including trust anchors
      * @returns Promise resolving to ValidationResult
      */
-    public async validate(asset: Asset, options?: ValidationOptions): Promise<ValidationResult> {
+    public async validate(asset: Asset, validationOptions?: ValidationOptions): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         if (!this.claim?.sourceBox) {
@@ -261,7 +261,7 @@ export class Manifest implements ManifestComponent {
         // Validate the signature
         const referencedSignature = this.getComponentByURL(this.claim?.signatureRef, true);
         if (this.signature && referencedSignature === this.signature) {
-            result.merge(await this.signature.validate(this.claim.getBytes(this.claim)!, options));
+            result.merge(await this.signature.validate(this.claim.getBytes(this.claim)!, validationOptions));
         } else {
             result.addError(ValidationStatusCode.ClaimSignatureMissing, this.claim.signatureRef);
         }

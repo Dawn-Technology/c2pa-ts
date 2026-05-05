@@ -79,9 +79,9 @@ export class Signature implements ManifestComponent {
         return this.sourceBox;
     }
 
-    public async validate(payload: Uint8Array, options?: ValidationOptions): Promise<ValidationResult> {
+    public async validate(payload: Uint8Array, validationOptions?: ValidationOptions): Promise<ValidationResult> {
         try {
-            return await this.signatureData.validate(payload, this.sourceBox, options);
+            return await this.signatureData.validate(payload, this.sourceBox, validationOptions);
         } catch (e) {
             if (e instanceof MalformedContentError) {
                 return ValidationResult.error(ValidationStatusCode.SigningCredentialInvalid, this.sourceBox);
