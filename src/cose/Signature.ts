@@ -674,7 +674,7 @@ export class Signature {
         trustedRoots: X509Certificate[],
     ): Promise<ValidationStatusCode> {
         let current = leaf;
-        const seen = new Set<ArrayBuffer>();
+        const seen = new Set<X509Certificate>();
 
         const trustedRootThumbprints = await Promise.all(
             trustedRoots.map(async r => {
@@ -718,11 +718,10 @@ export class Signature {
             }
 
             // Loop detection
-            if (seen.has(await issuer.getThumbprint())) {
+            if (seen.has(issuer)) {
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
-
-            seen.add(await issuer.getThumbprint());
+            seen.add(issuer);
             current = issuer;
         }
     }
