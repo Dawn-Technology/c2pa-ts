@@ -42,7 +42,7 @@ import {
     X509CertificateCreateSelfSignedParams,
     X509CertificateGenerator,
 } from '@peculiar/x509';
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
 import { CoseAlgorithmIdentifier, LocalSigner, TrustList } from '../src/cose';
 import { SuperBox } from '../src/jumbf';

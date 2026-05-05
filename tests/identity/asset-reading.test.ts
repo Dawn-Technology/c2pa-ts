@@ -175,12 +175,14 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
     'adobe_connected_identities.jpg': {
         assetType: JPEG,
         jumbf: true,
-        valid: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.SigningCredentialUntrusted],
     },
     'ims_multiple_manifests.jpg': {
         assetType: JPEG,
         jumbf: true,
-        valid: true,
+        valid: false,
+        statusCodes: [ValidationStatusCode.SigningCredentialUntrusted],
     },
     'malformed_cbor.jpg': {
         assetType: JPEG,

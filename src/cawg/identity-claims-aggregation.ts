@@ -555,7 +555,7 @@ function extractAlgorithmInfo(jwk: JsonWebKey): { namedCurve?: string; kty?: str
  * @param jwk - JsonWebKey
  * @returns Algorithm specification for crypto.subtle operations
  */
-function getAlgorithmFromJwk(jwk: JsonWebKey): Algorithm | null {
+function getAlgorithmFromJwk(jwk: JsonWebKey): (Algorithm & { namedCurve?: string }) | null {
     if (!jwk.kty) {
         return null;
     }
@@ -580,6 +580,7 @@ function getAlgorithmFromJwk(jwk: JsonWebKey): Algorithm | null {
 
         return {
             name: 'ECDSA',
+            namedCurve,
         };
     }
 
