@@ -1040,21 +1040,27 @@ describe('Certificate Chain Validation', () => {
 
     describe('8. Error Handling', () => {
         it('should handle malformed certificate data', async () => {
-            expect(async () => {
+            try {
                 new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
                     intermediateCert,
                     new X509Certificate(new Uint8Array([1, 2, 3, 4])),
                 ]);
-            }).rejects.toThrow();
+                assert.ok(false, 'Constructor should throw an error when given malformed certificate data');
+            } catch {
+                assert.ok(true, 'Constructor should throw an error when given malformed certificate data');
+            }
         });
 
         it('should handle empty certificate data', async () => {
-            expect(async () => {
+            try {
                 new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
                     intermediateCert,
                     new X509Certificate(new Uint8Array([])),
                 ]);
-            }).rejects.toThrow();
+                assert.ok(false, 'Constructor should throw an error when given empty certificate data');
+            } catch {
+                assert.ok(true, 'Constructor should throw an error when given empty certificate data');
+            }
         });
     });
 
