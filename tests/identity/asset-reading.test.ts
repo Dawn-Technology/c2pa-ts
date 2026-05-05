@@ -152,7 +152,7 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         valid: false,
         statusCodes: [ValidationStatusCode.IcaValidFromInvalid],
         options: {
-            validationTime: new Date('2024-09-01T00:00:00Z'),
+            cawg: { validationTime: new Date('2024-09-01T00:00:00Z') },
         },
     },
     'valid_until_in_future.jpg': {

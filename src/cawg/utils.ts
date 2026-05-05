@@ -138,6 +138,7 @@ export function signerPayloadToC2paAssetBinding(payload: SignerPayloadMap): C2pa
     return {
         referenced_assertions: payload.referenced_assertions.map(ra => ({
             url: ra.url,
+            ...(ra.alg && { alg: ra.alg }),
             hash: bytesToBase64(ra.hash),
         })),
         sig_type: payload.sig_type,
@@ -176,6 +177,7 @@ export function c2paAssetBindingToSignerPayload(binding: C2paAssetBinding): Sign
     return {
         referenced_assertions: binding.referenced_assertions.map(ra => ({
             url: ra.url,
+            ...(ra.alg && { alg: ra.alg }),
             hash: base64ToBytes(ra.hash),
         })),
         sig_type: binding.sig_type,

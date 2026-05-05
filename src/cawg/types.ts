@@ -159,6 +159,7 @@ export interface C2paAssetBinding {
     /** Array of referenced assertions (with base64-encoded hashes) */
     referenced_assertions: {
         url: string;
+        alg?: string;
         hash: string;
     }[];
     /** Signature type */
@@ -267,7 +268,7 @@ export interface CawgTrustConfiguration {
     /** TODO For each EKU, list of accepted Certificate Policy OID values */
     // acceptedCertificatePolicies: Map<string, string[]>;
     /** List of X.509 certificate trust anchors */
-    trustAnchors: (string | Uint8Array | X509Certificate)[];
+    trustAnchors?: (string | Uint8Array | X509Certificate)[];
     /** TODO List of trusted identity claims aggregator DIDs */
     // trustedIcaIssuers?: string[];
     /** TODO List of trusted identity claims aggregator trust anchors */

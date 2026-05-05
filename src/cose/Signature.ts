@@ -289,7 +289,7 @@ export class Signature {
                     continue;
                 }
 
-                if (!(await this.verifySignedDataSignature(signedData))) {
+                if (!(await Signature.verifySignedDataSignature(signedData))) {
                     result.addError(ValidationStatusCode.TimeStampMismatch, sourceBox);
                     continue;
                 }
@@ -317,7 +317,7 @@ export class Signature {
         return result;
     }
 
-    private async verifySignedDataSignature(signedData: pkijs.SignedData): Promise<boolean> {
+    public static async verifySignedDataSignature(signedData: pkijs.SignedData): Promise<boolean> {
         if (!signedData.signerInfos.length) return false;
         const signerInfo = signedData.signerInfos[0];
 
@@ -502,7 +502,7 @@ export class Signature {
         return result;
     }
 
-    private static async validateCertificate(
+    public static async validateCertificate(
         certificate: X509Certificate,
         validityTimestamp: Date,
         isUsedForManifestSigning: boolean,

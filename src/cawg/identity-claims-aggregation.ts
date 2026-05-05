@@ -5,10 +5,11 @@
  * @module cawg/identity-claims-aggregation
  */
 
+import { X509Certificate } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import { DIDDocument, VerificationMethod } from 'did-resolver';
 import * as pkijs from 'pkijs';
-import { Algorithms } from '../cose';
+import { Algorithms, Signature } from '../cose';
 import { SigStructure } from '../cose/SigStructure';
 import { Crypto } from '../crypto';
 import type {
@@ -366,8 +367,6 @@ function extractPublicKeyFromDidDocument(didDocument: DIDDocument): DIDPublicKey
             if (publicKeyBase58) {
                 return ed25519Base58ToJwk(publicKeyBase58);
             }
-        } else if (method.publicKeyMultibase) {
-            return method.publicKeyMultibase;
         }
     }
     return null;
@@ -703,6 +702,20 @@ async function validateTimestamp(
         const actualHash = await Crypto.digest(toBeSigned, hashAlgorithm);
         if (!BinaryHelper.bufEqual(actualHash, hashedMessage)) {
             return false;
+        }
+
+        if (!(await Signature.verifySignedDataSignature(signedData))) {
+            return false;
+        }
+
+        // Validate TSA certificates
+        for (const cert of signedData.certificates ?? []) {
+            if (!(cert instanceof pkijs.Certificate)) continue;
+            const x509Cert = new X509Certificate(cert.toSchema().toBER());
+            const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
+            if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
+                return false;
+            }
         }
 
         return true;
