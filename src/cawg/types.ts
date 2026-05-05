@@ -229,10 +229,7 @@ export interface VerifiableCredential {
 /**
  * Identity claims aggregation verifiable credential
  */
-export interface IdentityClaimsAggregationCredential extends VerifiableCredential {
-    /** Array of verified identities */
-    verifiedIdentities: VerifiedIdentity[];
-}
+export type IdentityClaimsAggregationCredential = VerifiableCredential;
 
 /**
  * Placeholder assertion for reserving space during C2PA manifest creation

@@ -629,7 +629,7 @@ export class Manifest implements ManifestComponent {
         // Check for identity  assertions
         const identityAssertions: IdentityAssertion[] = this.assertions?.getIdentityAssertions() ?? [];
         for (const assertion of identityAssertions) {
-            result.merge(await assertion.validate(this, validationOptions));
+            result.merge(await assertion.validate(this, validationOptions?.cawg));
         }
         return result;
     }

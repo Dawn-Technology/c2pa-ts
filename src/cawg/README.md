@@ -73,7 +73,7 @@ Identity assertion construction is currently done through `IdentityAssertion` (m
 - `setSignerPayload(...)`
 - `setSignature(...)`
 
-See `tests/ica-signing.test.ts` for end-to-end examples with JPEG signing and validation.
+See `tests/identity-signing.test.ts` for end-to-end examples with JPEG signing and validation.
 
 ### 3) Validating identity assertions and ICA credentials
 
@@ -85,7 +85,6 @@ See `tests/ica-signing.test.ts` for end-to-end examples with JPEG signing and va
 `utils.ts` currently includes helpers such as:
 
 - `serializeSignerPayload()` / `deserializeSignerPayload()`
-- `serializeIdentityAssertion()` / `deserializeIdentityAssertion()`
 - `calculatePaddingSize()` and `validatePadding()`
 - `signerPayloadToC2paAssetBinding()` / `c2paAssetBindingToSignerPayload()`
 - `generateUniqueLabel()`

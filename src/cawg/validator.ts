@@ -10,10 +10,10 @@ import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } fr
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
 import {
     SignatureType,
+    type CawgValidationOptions,
     type ExpectedCountersignerMap,
     type HashedUriMap,
     type HashMap,
-    type CawgValidationOptions,
     type SignerPayloadMap,
 } from './types.js';
 import {
