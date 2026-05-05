@@ -1,4 +1,4 @@
-import { CawgValidationOptions, isEmptyOrMissing, validateIcaCredential, validateIdentityAssertion } from '../../cawg';
+import { CawgTrustConfiguration, isEmptyOrMissing, validateIcaCredential, validateIdentityAssertion } from '../../cawg';
 import * as JUMBF from '../../jumbf';
 import { BinaryHelper } from '../../util';
 import { Claim } from '../Claim';
@@ -156,7 +156,7 @@ export class IdentityAssertion extends Assertion {
 
     public override async validate(
         manifest: Manifest,
-        validationOptions?: CawgValidationOptions,
+        validationOptions?: CawgTrustConfiguration,
     ): Promise<ValidationResult> {
         const result = await super.validate(manifest);
 
@@ -168,9 +168,7 @@ export class IdentityAssertion extends Assertion {
             );
         }
         result.merge(await validateIdentityAssertion(manifest, this, this.label, this.sourceBox, validationOptions));
-        result.merge(
-            await validateIcaCredential(this.signature, this.signerPayload, this.label, [], validationOptions),
-        );
+        result.merge(await validateIcaCredential(this.signature, this.signerPayload, this.label, validationOptions));
         return result;
     }
 

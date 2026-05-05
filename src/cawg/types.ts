@@ -271,14 +271,6 @@ export interface CawgTrustConfiguration {
     acceptedCertificatePolicies: Map<string, string[]>;
     /** List of X.509 certificate trust anchors */
     trustAnchors: (string | Uint8Array | X509Certificate)[];
-}
-
-/**
- * Options for validating an identity assertion
- */
-export interface CawgValidationOptions extends ValidationOptions {
-    /** Trust configuration for X.509 certificates */
-    trustConfiguration?: CawgTrustConfiguration;
     /** List of trusted identity claims aggregator DIDs */
     trustedIcaIssuers?: string[];
     /** List of trusted identity claims aggregator trust anchors */
@@ -287,6 +279,14 @@ export interface CawgValidationOptions extends ValidationOptions {
     checkRevocation?: boolean;
     /** Current time for validation (defaults to now) */
     validationTime?: Date;
+}
+
+/**
+ * Options for validating an identity assertion
+ */
+export interface CawgValidationOptions extends ValidationOptions {
+    /** Trust configuration  */
+    cawg?: CawgTrustConfiguration;
 }
 
 /**

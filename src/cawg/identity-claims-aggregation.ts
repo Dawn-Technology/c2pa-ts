@@ -22,6 +22,7 @@ import { ValidationResult, ValidationStatusCode } from '../manifest';
 import { BinaryHelper } from '../util';
 import { didResolver } from './did-resolver';
 import {
+    CawgTrustConfiguration,
     SCHEMA_URL,
     SUPPORTED_COSE_ALGORITHMS,
     SUPPORTED_DID_METHODS,
@@ -29,7 +30,6 @@ import {
     VC_CONTEXT,
     VC_TYPE,
     type C2paAssetBinding,
-    type CawgValidationOptions,
     type CredentialStatus,
     type DecodedCoseSign1,
     type DecodedCoseSign1Typing,
@@ -114,16 +114,14 @@ export function createIcaCredential(
  * @param signature - COSE_Sign1 signature bytes
  * @param signerPayload - Expected signer_payload from identity assertion
  * @param assertionLabel - Label of the identity assertion
- * @param trustedIssuers - List of trusted ICA issuer DIDs
- * @param options - Validation options
+ * @param validationOptions - Validation options
  * @returns Validation result
  */
 export async function validateIcaCredential(
     signature: Uint8Array,
     signerPayload: SignerPayloadMap,
     assertionLabel: string,
-    trustedIssuers: string[],
-    options?: CawgValidationOptions,
+    validationOptions?: CawgTrustConfiguration,
 ): Promise<ValidationResult> {
     const result: ValidationResult = new ValidationResult();
 
@@ -219,7 +217,7 @@ export async function validateIcaCredential(
         }
 
         // Step 6: Verify issuer is trusted
-        const issuerTrusted = await verifyIssuerTrust(issuerDid, trustedIssuers, options?.trustedIcaAnchors);
+        const issuerTrusted = await verifyIssuerTrust(issuerDid, validationOptions);
 
         if (!issuerTrusted) {
             result.addError(
@@ -261,10 +259,10 @@ export async function validateIcaCredential(
         }
 
         // Step 9: Verify validity dates
-        validateCredentialValidityDates(credential, assertionLabel, result, options?.validationTime);
+        validateCredentialValidityDates(credential, assertionLabel, result, validationOptions?.validationTime);
 
         // Step 10: Check revocation status
-        if (options?.checkRevocation && credential.credentialStatus) {
+        if (validationOptions?.checkRevocation && credential.credentialStatus) {
             await validateRevocationStatus(credential, assertionLabel, result);
         }
 
@@ -400,15 +398,13 @@ function ed25519Base58ToJwk(publicKeyBase58: string): JsonWebKey {
     return { kty: 'OKP', crv: 'Ed25519', x };
 }
 
-async function verifyIssuerTrust(
-    issuerDid: string,
-    trustedIssuers: string[],
-    trustedAnchors?: string[],
-): Promise<boolean> {
+// The validator SHALL verify that the issuer’s DID is present or can be traced to its preconfigured list of
+// trustable entities. If the issuer is not verifiably trusted, the validator MUST issue the failure code
+// cawg.ica.untrusted_issuer but MAY continue validation.
+// TODO
+async function verifyIssuerTrust(issuerDid: string, validationOptions?: CawgTrustConfiguration): Promise<boolean> {
     // Mock
     return true;
-    // Check if issuer is directly trusted or chains to trusted anchor
-    // return trustedIssuers.includes(issuerDid);
 }
 
 async function verifyCoseSign1(coseSign1: DecodedCoseSign1, publicKey: DIDPublicKey): Promise<boolean> {

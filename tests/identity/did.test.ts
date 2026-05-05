@@ -263,9 +263,7 @@ describe('DID validation', () => {
             const restoreDidResolver = installDidResolverMock(fixture.issuerDid, fixture.didDocument);
 
             try {
-                const result = await validateIcaCredential(coseSign1, signerPayload, 'cawg.identity', [
-                    fixture.issuerDid,
-                ]);
+                const result = await validateIcaCredential(coseSign1, signerPayload, 'cawg.identity');
                 const errors = failedCodes(result);
 
                 for (const code of DID_ERROR_CODES) {
@@ -305,9 +303,7 @@ describe('DID validation', () => {
             const restoreDidResolver = installDidResolverMock(fixture.issuerDid, fixture.didDocument);
 
             try {
-                const result = await validateIcaCredential(tamperedCoseSign1, signerPayload, 'cawg.identity', [
-                    fixture.issuerDid,
-                ]);
+                const result = await validateIcaCredential(tamperedCoseSign1, signerPayload, 'cawg.identity');
                 const errors = failedCodes(result);
 
                 for (const code of DID_ERROR_CODES) {
