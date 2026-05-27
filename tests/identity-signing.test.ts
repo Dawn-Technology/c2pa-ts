@@ -570,6 +570,184 @@ describe('Identity Assertion with Optional Fields', function () {
     });
 });
 
+describe('Identity Assertion expected_claim_generator Validation', function () {
+    const targetFileCorrect = 'tests/fixtures/dawn-technology-icon-signed-ecg-correct.jpg';
+    const targetFileWrong = 'tests/fixtures/dawn-technology-icon-signed-ecg-wrong.jpg';
+    let certHash: Uint8Array | undefined;
+
+    afterAll(async function () {
+        await fs.unlink(targetFileCorrect).catch(() => undefined);
+        await fs.unlink(targetFileWrong).catch(() => undefined);
+    });
+
+    it('signs with correct expected_claim_generator hash', async function () {
+        const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
+
+        certHash = await Crypto.digest(new Uint8Array(signer.certificate.rawData), 'SHA-256');
+
+        const buf = await fs.readFile(sourceFile);
+        assert.ok(buf);
+        assert.ok(await JPEG.canRead(buf));
+
+        const asset = await JPEG.create(buf);
+
+        const manifestStore = new ManifestStore();
+        const manifest = manifestStore.createManifest({
+            assetFormat: 'image/jpeg',
+            instanceID: 'ecg-correct-test',
+            defaultHashAlgorithm: 'SHA-256',
+            signer,
+        });
+
+        const dataHashAssertion = DataHashAssertion.create('SHA-256');
+        manifest.addAssertion(dataHashAssertion);
+
+        const identityAssertion = new IdentityAssertion();
+        identityAssertion.setSignerPayload(
+            [{ url: `self#jumbf=c2pa.assertions/c2pa.hash.data`, hash: new Uint8Array(32).fill(0x00) }],
+            SignatureType.X509Cose,
+            ['cawg.creator'],
+            { expectedClaimGenerator: { alg: 'sha256', hash: new Uint8Array(32).fill(0x00) } },
+        );
+        identityAssertion.setSignature(new Uint8Array(64).fill(0xdd), new Uint8Array(256).fill(0x00));
+        manifest.addAssertion(identityAssertion);
+
+        await asset.ensureManifestSpace(manifestStore.measureSize());
+        await dataHashAssertion.updateWithAsset(asset);
+
+        // First signing pass to populate claim assertion hashes
+        await manifest.sign(signer, timestampProvider);
+
+        assert(manifest.claim, 'Manifest claim missing after signing');
+
+        const hardBindingRef = manifest.claim.assertions.find(
+            ref => ref.uri === `self#jumbf=c2pa.assertions/${dataHashAssertion.fullLabel}`,
+        );
+        assert(hardBindingRef, 'Hard binding reference not found in claim assertions');
+
+        // Second pass: correct hard binding hash + correct certificate hash as expected_claim_generator
+        identityAssertion.setSignerPayload(
+            [{ url: hardBindingRef.uri, hash: hardBindingRef.hash }],
+            SignatureType.X509Cose,
+            ['cawg.creator'],
+            { expectedClaimGenerator: { alg: 'sha256', hash: certHash } },
+        );
+
+        await manifest.sign(signer, timestampProvider);
+        await asset.writeManifestJUMBF(manifestStore.getBytes());
+        await fs.writeFile(targetFileCorrect, await asset.getDataRange());
+    });
+
+    it('validates correct expected_claim_generator does not emit mismatch', async function () {
+        if (!certHash) return;
+
+        const buf = await fs.readFile(targetFileCorrect).catch(() => undefined);
+        if (!buf) return;
+
+        const asset = await JPEG.create(buf);
+        const jumbf = await asset.getManifestJUMBF();
+        assert.ok(jumbf, 'no JUMBF found');
+
+        const superBox = SuperBox.fromBuffer(jumbf);
+        const manifestStore = ManifestStore.read(superBox);
+
+        const activeManifest = manifestStore.getActiveManifest();
+        assert.ok(activeManifest, 'no active manifest found');
+
+        const identityAssertion = activeManifest.assertions?.assertions.find(
+            (a: Assertion) => a.label === 'cawg.identity',
+        );
+        assert.ok(identityAssertion instanceof IdentityAssertion, 'no IdentityAssertion found');
+        assert.ok(identityAssertion.signerPayload.expected_claim_generator, 'expected_claim_generator field missing');
+        assert.equal(identityAssertion.signerPayload.expected_claim_generator.alg, 'sha256');
+        assert.equal(identityAssertion.signerPayload.expected_claim_generator.hash.length, 32);
+
+        const validationResult = await manifestStore.validate(asset);
+
+        const ecgMismatch = validationResult.statusEntries.find(
+            e => e.code === ValidationStatusCode.IdentityExpectedClaimGeneratorMismatch,
+        );
+        assert.ok(
+            !ecgMismatch,
+            `expected_claim_generator should not emit mismatch for correct hash, but got: ${ecgMismatch?.code}`,
+        );
+    });
+
+    it('signs with wrong expected_claim_generator hash', async function () {
+        const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
+
+        const buf = await fs.readFile(sourceFile);
+        const asset = await JPEG.create(buf);
+
+        const manifestStore = new ManifestStore();
+        const manifest = manifestStore.createManifest({
+            assetFormat: 'image/jpeg',
+            instanceID: 'ecg-wrong-test',
+            defaultHashAlgorithm: 'SHA-256',
+            signer,
+        });
+
+        const dataHashAssertion = DataHashAssertion.create('SHA-256');
+        manifest.addAssertion(dataHashAssertion);
+
+        // Deliberately wrong hash — all 0xff bytes, clearly not a certificate hash
+        const wrongHash = new Uint8Array(32).fill(0xff);
+
+        const identityAssertion = new IdentityAssertion();
+        identityAssertion.setSignerPayload(
+            [{ url: `self#jumbf=c2pa.assertions/c2pa.hash.data`, hash: new Uint8Array(32).fill(0x00) }],
+            SignatureType.X509Cose,
+            ['cawg.creator'],
+            { expectedClaimGenerator: { alg: 'sha256', hash: wrongHash } },
+        );
+        identityAssertion.setSignature(new Uint8Array(64).fill(0xdd), new Uint8Array(256).fill(0x00));
+        manifest.addAssertion(identityAssertion);
+
+        await asset.ensureManifestSpace(manifestStore.measureSize());
+        await dataHashAssertion.updateWithAsset(asset);
+
+        await manifest.sign(signer, timestampProvider);
+
+        assert(manifest.claim, 'Manifest claim missing after signing');
+
+        const hardBindingRef = manifest.claim.assertions.find(
+            ref => ref.uri === `self#jumbf=c2pa.assertions/${dataHashAssertion.fullLabel}`,
+        );
+        assert(hardBindingRef, 'Hard binding reference not found in claim assertions');
+
+        identityAssertion.setSignerPayload(
+            [{ url: hardBindingRef.uri, hash: hardBindingRef.hash }],
+            SignatureType.X509Cose,
+            ['cawg.creator'],
+            { expectedClaimGenerator: { alg: 'sha256', hash: wrongHash } },
+        );
+
+        await manifest.sign(signer, timestampProvider);
+        await asset.writeManifestJUMBF(manifestStore.getBytes());
+        await fs.writeFile(targetFileWrong, await asset.getDataRange());
+    });
+
+    it('reports IdentityExpectedClaimGeneratorMismatch for wrong hash', async function () {
+        const buf = await fs.readFile(targetFileWrong).catch(() => undefined);
+        if (!buf) return;
+
+        const asset = await JPEG.create(buf);
+        const jumbf = await asset.getManifestJUMBF();
+        assert.ok(jumbf, 'no JUMBF found');
+
+        const superBox = SuperBox.fromBuffer(jumbf);
+        const manifestStore = ManifestStore.read(superBox);
+
+        const validationResult = await manifestStore.validate(asset);
+
+        const ecgMismatch = validationResult.statusEntries.find(
+            e => e.code === ValidationStatusCode.IdentityExpectedClaimGeneratorMismatch,
+        );
+        assert.ok(ecgMismatch, 'IdentityExpectedClaimGeneratorMismatch should be reported for wrong hash');
+        assert.ok(!ecgMismatch.success, 'mismatch entry should not be a success');
+    });
+});
+
 describe('Identity Assertion Reference Verification', function () {
     it('should correctly hash and reference data hash assertion', async function () {
         const { signer } = await loadTestCertificate(TEST_CERTIFICATES[0]);

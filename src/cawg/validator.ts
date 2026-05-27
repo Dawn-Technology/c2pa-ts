@@ -114,12 +114,14 @@ export async function validateIdentityAssertion(
 
     // Step 8: Validate expected_claim_generator if present
     if (payload.expected_claim_generator) {
-        result.merge(await validateExpectedClaimGenerator(payload.expected_claim_generator, sourceBox));
+        result.merge(await validateExpectedClaimGenerator(payload.expected_claim_generator, sourceBox, manifest));
     }
 
     // Step 9: Validate expected_countersigners if present
     if (payload.expected_countersigners) {
-        result.merge(await validateExpectedCountersigners(payload.expected_countersigners, sourceBox, assertionLabel));
+        result.merge(
+            await validateExpectedCountersigners(payload.expected_countersigners, sourceBox, manifest, assertion),
+        );
     }
 
     // Step 10: Validate signature based on sig_type
@@ -291,13 +293,16 @@ async function validateExpectedPartialClaim(
 /**
  * Validate expected_claim_generator field
  */
-async function validateExpectedClaimGenerator(expected: HashMap, sourceBox: JUMBF.SuperBox): Promise<ValidationResult> {
+async function validateExpectedClaimGenerator(
+    expected: HashMap,
+    sourceBox: JUMBF.SuperBox,
+    manifest: Manifest,
+): Promise<ValidationResult> {
     const result = new ValidationResult();
     try {
-        // Extract end-entity certificate from claim signature
-        const certificate = extractClaimGeneratorCertificate(sourceBox);
-
-        if (!certificate) {
+        // Extract end-entity certificate DER bytes from the manifest claim signature
+        const certRawData = manifest.signature?.signatureData?.certificate?.rawData;
+        if (!certRawData) {
             result.addError(
                 ValidationStatusCode.IdentityExpectedClaimGeneratorMismatch,
                 sourceBox,
@@ -305,6 +310,7 @@ async function validateExpectedClaimGenerator(expected: HashMap, sourceBox: JUMB
             );
             return result;
         }
+        const certificate = new Uint8Array(certRawData);
 
         // Compute hash of certificate
         const computed = await computeHash(certificate, expected.alg);
@@ -323,7 +329,7 @@ async function validateExpectedClaimGenerator(expected: HashMap, sourceBox: JUMB
             `Error validating expected_claim_generator: ${error instanceof Error ? error.message : String(error)}`,
         );
     }
-    return new ValidationResult(); // Mocked for now until implementation is complete
+    return result;
 }
 
 /**
@@ -332,12 +338,14 @@ async function validateExpectedClaimGenerator(expected: HashMap, sourceBox: JUMB
 async function validateExpectedCountersigners(
     expectedCountersigners: ExpectedCountersignerMap[],
     sourceBox: JUMBF.SuperBox,
-    assertionLabel: string,
+    manifest: Manifest,
+    assertion: IdentityAssertion,
 ): Promise<ValidationResult> {
     const result = new ValidationResult();
 
-    // TODO Find all other identity assertions in the manifest
-    const otherIdentityAssertions = findIdentityAssertions(sourceBox, assertionLabel);
+    // Find all other identity assertions in the manifest
+    let otherIdentityAssertions = manifest?.assertions?.getIdentityAssertions() ?? [];
+    otherIdentityAssertions = otherIdentityAssertions.filter(a => a !== assertion); // Exclude the current assertion being validated
 
     for (const otherAssertion of otherIdentityAssertions) {
         // Remove expected_countersigners field from the signer_payload
@@ -398,23 +406,6 @@ function replaceAssertionHash(claimData: Claim, label: string): void {
             assertion.hash = new Uint8Array(assertion.hash.length);
         }
     }
-}
-
-/**
- * Helper: Extract claim generator certificate
- */
-function extractClaimGeneratorCertificate(claimData: JUMBF.SuperBox): Uint8Array | null {
-    // TODO Extract from claim signature structure
-    return null;
-}
-
-/**
- * Helper: Find other identity assertions in claim
- */
-function findIdentityAssertions(claimData: JUMBF.SuperBox, excludeLabel: string): IdentityAssertion[] {
-    // TODO  Implementation would find all identity assertions
-    // except the one with excludeLabel
-    return [];
 }
 
 /**
