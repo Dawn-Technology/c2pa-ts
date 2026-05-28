@@ -5,6 +5,7 @@
  * @module cawg/utils
  */
 import * as cborX from 'cbor-x';
+import { CoseAlgorithmIdentifier, Signer } from '../cose';
 import { Crypto, HashAlgorithm } from '../crypto';
 import { Claim } from '../manifest/index.js';
 import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from './types.js';
@@ -349,4 +350,27 @@ export function deepEqual(a: unknown, b: unknown): boolean {
  */
 export function isEmptyOrMissing(data: Uint8Array | null | undefined): boolean {
     return !data || data.length === 0;
+}
+
+export async function getSignerPublicJwk(signer: Signer): Promise<JsonWebKey> {
+    const spki = new Uint8Array(signer.certificate.publicKey.rawData);
+    let importAlgorithm: EcKeyImportParams | Algorithm;
+    if (signer.algorithm === CoseAlgorithmIdentifier.Ed25519) {
+        importAlgorithm = { name: 'Ed25519' };
+    } else {
+        importAlgorithm = {
+            name: 'ECDSA',
+            namedCurve: 'P-256',
+        };
+    }
+
+    const publicKey = await crypto.subtle.importKey('spki', spki, importAlgorithm, true, ['verify']);
+    return crypto.subtle.exportKey('jwk', publicKey);
+}
+
+export function createDidJwk(publicJwk: JsonWebKey): string {
+    // did:jwk requires a base64url-encoded JSON JWK as method-specific identifier.
+    const canonicalJwk = Object.fromEntries(Object.entries(publicJwk).sort(([a], [b]) => a.localeCompare(b)));
+    const didPayload = Buffer.from(JSON.stringify(canonicalJwk), 'utf8').toString('base64url');
+    return `did:jwk:${didPayload}`;
 }

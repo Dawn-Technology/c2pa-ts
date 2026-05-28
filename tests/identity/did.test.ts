@@ -5,14 +5,18 @@ import { JsonWebKey as DidResolverJsonWebKey } from 'did-resolver';
 import {
     createIcaCredential,
     didResolver,
+    NamedActorRole,
+    SignatureType,
     SUPPORTED_DID_METHODS,
     validateIcaCredential,
+    VerifiedIdentityType,
     type SignerPayloadMap,
 } from '../../src/cawg';
 import { CoseAlgorithmIdentifier } from '../../src/cose';
 import { SigStructure } from '../../src/cose/SigStructure';
 import { CBORBox } from '../../src/jumbf';
-import { ValidationStatusCode } from '../../src/manifest';
+import { AssertionLabels, ValidationStatusCode } from '../../src/manifest';
+
 
 type SupportedDidMethod = (typeof SUPPORTED_DID_METHODS)[number];
 
@@ -227,8 +231,8 @@ function makeSignerPayload(): SignerPayloadMap {
                 hash: new Uint8Array([1, 2, 3, 4]),
             },
         ],
-        sig_type: 'cawg.identity_claims_aggregation',
-        role: ['cawg.creator'],
+        sig_type: SignatureType.IdentityClaimsAggregation,
+        role: [NamedActorRole.Creator],
     };
 }
 
@@ -247,7 +251,7 @@ describe('DID validation', () => {
                 {
                     verifiedIdentities: [
                         {
-                            type: 'cawg.web_site',
+                            type: VerifiedIdentityType.Website,
                             uri: 'https://issuer.example.com',
                             provider: { name: 'Example Provider' },
                             verifiedAt: new Date().toISOString(),
@@ -263,7 +267,7 @@ describe('DID validation', () => {
             const restoreDidResolver = installDidResolverMock(fixture.issuerDid, fixture.didDocument);
 
             try {
-                const result = await validateIcaCredential(coseSign1, signerPayload, 'cawg.identity');
+                const result = await validateIcaCredential(coseSign1, signerPayload, AssertionLabels.identity);
                 const errors = failedCodes(result);
 
                 for (const code of DID_ERROR_CODES) {
@@ -286,7 +290,7 @@ describe('DID validation', () => {
                 {
                     verifiedIdentities: [
                         {
-                            type: 'cawg.web_site',
+                            type: VerifiedIdentityType.Website,
                             uri: 'https://issuer.example.com',
                             provider: { name: 'Example Provider' },
                             verifiedAt: new Date().toISOString(),
@@ -303,7 +307,7 @@ describe('DID validation', () => {
             const restoreDidResolver = installDidResolverMock(fixture.issuerDid, fixture.didDocument);
 
             try {
-                const result = await validateIcaCredential(tamperedCoseSign1, signerPayload, 'cawg.identity');
+                const result = await validateIcaCredential(tamperedCoseSign1, signerPayload, AssertionLabels.identity);
                 const errors = failedCodes(result);
 
                 for (const code of DID_ERROR_CODES) {

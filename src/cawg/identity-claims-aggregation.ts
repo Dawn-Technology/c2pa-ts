@@ -9,7 +9,7 @@ import { X509Certificate } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import { DIDDocument, VerificationMethod } from 'did-resolver';
 import * as pkijs from 'pkijs';
-import { Algorithms, Signature } from '../cose';
+import { Algorithms, Signature, Signer } from '../cose';
 import { SigStructure } from '../cose/SigStructure';
 import { Crypto } from '../crypto';
 import type {
@@ -19,6 +19,7 @@ import type {
     SigningAlgorithm,
 } from '../crypto/types';
 import * as JUMBF from '../jumbf';
+import { CBORBox } from '../jumbf';
 import { ValidationResult, ValidationStatusCode } from '../manifest';
 import { BinaryHelper } from '../util';
 import { didResolver } from './did-resolver';
@@ -105,6 +106,29 @@ export function createIcaCredential(
     }
 
     return credential;
+}
+
+export async function createIcaSignature(icaCredential: VerifiableCredential, signer: Signer): Promise<Uint8Array> {
+    const icaCredentialBytes = new TextEncoder().encode(JSON.stringify(icaCredential));
+    const icaSignature = await createIcaCoseSign1(icaCredentialBytes, signer);
+    return icaSignature;
+}
+
+export async function createIcaCoseSign1(payload: Uint8Array, signer: Signer): Promise<Uint8Array> {
+    const protectedHeaderBytes = CBORBox.encoder.encode({
+        '1': signer.algorithm,
+        '3': 'application/vc',
+    });
+
+    const toBeSigned = new SigStructure('Signature1', protectedHeaderBytes, payload).encode();
+    const signature = await signer.sign(toBeSigned);
+
+    const coseSign1 = [protectedHeaderBytes, {}, payload, signature];
+    const cborBox = new CBORBox();
+    cborBox.tag = 18;
+    cborBox.content = coseSign1;
+    cborBox.generateRawContent();
+    return cborBox.rawContent!;
 }
 
 /**

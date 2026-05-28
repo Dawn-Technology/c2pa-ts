@@ -1,4 +1,4 @@
-import { CawgTrustConfiguration, isEmptyOrMissing, validateIcaCredential, validateIdentityAssertion } from '../../cawg';
+import { CawgTrustConfiguration, isEmptyOrMissing, NamedActorRole, SignatureType, validateIcaCredential, validateIdentityAssertion } from '../../cawg';
 import * as JUMBF from '../../jumbf';
 import { BinaryHelper } from '../../util';
 import { Claim } from '../Claim';
@@ -8,6 +8,8 @@ import { ValidationStatusCode } from '../types';
 import { ValidationError } from '../ValidationError';
 import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
+import { AssertionLabels } from './AssertionLabels';
+
 
 /**
  * Hash algorithm and value map used in CAWG identity assertions
@@ -39,8 +41,8 @@ interface ExpectedCountersignerMap {
  */
 interface SignerPayloadMap {
     referenced_assertions: HashedUriMap[];
-    sig_type: string;
-    role?: string[];
+    sig_type: SignatureType;
+    role?: NamedActorRole[];
     expected_partial_claim?: HashMap;
     expected_claim_generator?: HashMap;
     expected_countersigners?: ExpectedCountersignerMap[];
@@ -67,13 +69,13 @@ interface RawIdentityAssertion {
  * @see https://creator-assertions.github.io/identity/1.2/
  */
 export class IdentityAssertion extends Assertion {
-    public label = 'cawg.identity' as const;
+    public label = AssertionLabels.identity;
     public uuid = raw.UUIDs.cborAssertion;
 
     /** Content to be signed by credential holder */
     public signerPayload: SignerPayloadMap = {
         referenced_assertions: [],
-        sig_type: '',
+        sig_type: SignatureType.IdentityClaimsAggregation,
     };
 
     /** Raw byte stream of the credential holder's signature */
@@ -84,6 +86,8 @@ export class IdentityAssertion extends Assertion {
 
     /** Optional second padding field filled with 0x00 values */
     public pad2?: Uint8Array;
+
+    public reservedSize: number | undefined;
 
     public readContentFromJUMBF(box: JUMBF.IBox): void {
         if (!(box instanceof JUMBF.CBORBox) || !this.uuid || !BinaryHelper.bufEqual(this.uuid, raw.UUIDs.cborAssertion))
@@ -140,9 +144,6 @@ export class IdentityAssertion extends Assertion {
         const rawContent: RawIdentityAssertion = {
             signer_payload: this.signerPayload,
             signature: this.signature,
-            // signature_info: {
-            //     "alg": "Es256",
-            // },
             pad1: this.pad1,
         };
 
@@ -177,8 +178,8 @@ export class IdentityAssertion extends Assertion {
      */
     public setSignerPayload(
         referencedAssertions: HashedUriMap[],
-        sigType: string,
-        roles?: string[],
+        sigType: SignatureType,
+        roles?: NamedActorRole[],
         options?: {
             expectedPartialClaim?: HashMap;
             expectedClaimGenerator?: HashMap;
@@ -198,10 +199,37 @@ export class IdentityAssertion extends Assertion {
     /**
      * Sets the signature and padding fields
      */
-    public setSignature(signature: Uint8Array, pad1: Uint8Array, pad2?: Uint8Array): void {
+    public setSignature(signature: Uint8Array, pad1: Uint8Array, pad2?: Uint8Array, manifest?: Manifest): void {
         this.signature = signature;
 
         this.pad1 = pad1;
         this.pad2 = pad2;
+
+        if (!manifest) return;
+        if (this.reservedSize) {
+            this.adjustSize(manifest, this.reservedSize);
+        } else {
+            this.reservedSize = this.generateJUMBFBox(manifest.claim).toBuffer(false).length;
+        }
+    }
+
+    public adjustSize(manifest: Manifest, targetAssertionSize: number): void {
+        for (let i = 0; i < 4; i++) {
+            const currentSize = this.generateJUMBFBox(manifest.claim).toBuffer(false).length;
+            if (currentSize === targetAssertionSize) {
+                return;
+            }
+            if (currentSize > targetAssertionSize) {
+                throw new Error('ICA credential exceeds reserved assertion size');
+            }
+
+            const delta = targetAssertionSize - currentSize;
+            this.pad1 = new Uint8Array(this.pad1.length + delta).fill(0x00);
+        }
+
+        const finalSize = this.generateJUMBFBox(manifest.claim).toBuffer(false).length;
+        if (finalSize !== targetAssertionSize) {
+            throw new Error('Failed to match reserved identity assertion size');
+        }
     }
 }

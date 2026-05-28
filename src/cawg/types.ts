@@ -67,9 +67,9 @@ export interface SignerPayloadMap {
     /** Array of referenced assertions */
     referenced_assertions: HashedUriMap[];
     /** Signature type identifier */
-    sig_type: string;
+    sig_type: SignatureType;
     /** Optional roles describing the named actor's relationship to the C2PA asset */
-    role?: string[];
+    role?: NamedActorRole[];
     /** Optional hash of expected partial claim */
     expected_partial_claim?: HashMap;
     /** Optional hash of expected claim generator certificate */
@@ -95,7 +95,7 @@ export enum VerifiedIdentityType {
     /** Government-issued identity document verification */
     DocumentVerification = 'cawg.document_verification',
     /** Web site domain control verification */
-    WebSite = 'cawg.web_site',
+    Website = 'cawg.web_site',
     /** Organizational affiliation verification */
     Affiliation = 'cawg.affiliation',
     /** Social media account verification */
@@ -135,7 +135,7 @@ export interface IdentityProvider {
  */
 export interface VerifiedIdentity {
     /** Type of verification performed */
-    type: string;
+    type: VerifiedIdentityType;
     /** Optional display name */
     name?: string;
     /** Optional user name */
@@ -285,26 +285,6 @@ export interface CawgTrustConfiguration {
 export interface CawgValidationOptions extends ValidationOptions {
     /** Trust configuration  */
     cawg?: CawgTrustConfiguration;
-}
-
-/**
- * Options for creating an identity assertion
- */
-export interface IdentityAssertionCreationOptions {
-    /** Referenced assertions including the hard binding */
-    referencedAssertions: HashedUriMap[];
-    /** Signature type */
-    sigType: string;
-    /** Optional roles for the named actor */
-    roles?: string[];
-    /** Optional expected partial claim hash */
-    expectedPartialClaim?: HashMap;
-    /** Optional expected claim generator certificate hash */
-    expectedClaimGenerator?: HashMap;
-    /** Optional expected countersigners */
-    expectedCountersigners?: ExpectedCountersignerMap[];
-    /** Reserved space size for signature (for placeholder assertions) */
-    reservedSignatureSize?: number;
 }
 
 /**

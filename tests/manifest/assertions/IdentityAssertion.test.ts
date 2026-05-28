@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'bun:test';
-import { SignatureType } from '../../../src/cawg';
+import { NamedActorRole, SignatureType } from '../../../src/cawg';
 import { CBORBox, DescriptionBox, SuperBox } from '../../../src/jumbf';
-import { Assertion, Claim, IdentityAssertion } from '../../../src/manifest';
+import { Assertion, AssertionLabels, Claim, IdentityAssertion } from '../../../src/manifest';
 import * as raw from '../../../src/manifest/rawTypes';
+
 
 describe('IdentityAssertion Tests', function () {
     const claim = new Claim();
@@ -22,7 +23,7 @@ describe('IdentityAssertion Tests', function () {
                 },
             ],
             sig_type: SignatureType.X509Cose,
-            role: ['cawg.creator'],
+            role: [NamedActorRole.Creator],
         },
         signature: new Uint8Array([
             0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf, 0xb0, 0xb1,
@@ -35,7 +36,7 @@ describe('IdentityAssertion Tests', function () {
     it('construct a JUMBF box with identity assertion', function () {
         superBox = new SuperBox();
         superBox.descriptionBox = new DescriptionBox();
-        superBox.descriptionBox.label = 'cawg.identity';
+        superBox.descriptionBox.label = AssertionLabels.identity;
         superBox.descriptionBox.uuid = raw.UUIDs.cborAssertion;
 
         const cborBox = new CBORBox();
@@ -44,7 +45,7 @@ describe('IdentityAssertion Tests', function () {
 
         // verify box content
         assert.ok(superBox.descriptionBox);
-        assert.equal(superBox.descriptionBox.label, 'cawg.identity');
+        assert.equal(superBox.descriptionBox.label, AssertionLabels.identity);
         assert.deepEqual(superBox.descriptionBox.uuid, raw.UUIDs.cborAssertion);
         assert.equal(superBox.contentBoxes.length, 1);
         assert.ok(superBox.contentBoxes[0] instanceof CBORBox);
@@ -58,12 +59,12 @@ describe('IdentityAssertion Tests', function () {
         identityAssertion.readFromJUMBF(superBox, claim);
 
         assert.equal(identityAssertion.sourceBox, superBox);
-        assert.equal(identityAssertion.label, 'cawg.identity');
+        assert.equal(identityAssertion.label, AssertionLabels.identity);
         assert.deepEqual(identityAssertion.uuid, raw.UUIDs.cborAssertion);
 
         // Verify signer payload
         assert.equal(identityAssertion.signerPayload.sig_type, SignatureType.X509Cose);
-        assert.deepEqual(identityAssertion.signerPayload.role, ['cawg.creator']);
+        assert.deepEqual(identityAssertion.signerPayload.role, [NamedActorRole.Creator]);
         assert.equal(identityAssertion.signerPayload.referenced_assertions.length, 1);
         assert.equal(
             identityAssertion.signerPayload.referenced_assertions[0].url,
@@ -95,14 +96,14 @@ describe('IdentityAssertion Tests', function () {
 
         // verify box content
         assert.ok(box.descriptionBox);
-        assert.equal(box.descriptionBox.label, 'cawg.identity');
+        assert.equal(box.descriptionBox.label, AssertionLabels.identity);
         assert.deepEqual(box.descriptionBox.uuid, raw.UUIDs.cborAssertion);
         assert.equal(box.contentBoxes.length, 1);
         assert.ok(box.contentBoxes[0] instanceof CBORBox);
 
         const content = box.contentBoxes[0].content as typeof exampleIdentityAssertion;
         assert.equal(content.signer_payload.sig_type, SignatureType.X509Cose);
-        assert.deepEqual(content.signer_payload.role, ['cawg.creator']);
+        assert.deepEqual(content.signer_payload.role, [NamedActorRole.Creator]);
         assert.deepEqual(content.signature, exampleIdentityAssertion.signature);
         assert.deepEqual(content.pad1, exampleIdentityAssertion.pad1);
     });
@@ -120,7 +121,7 @@ describe('IdentityAssertion Tests', function () {
                 },
             ],
             SignatureType.X509Cose,
-            ['cawg.creator', 'cawg.contributor'],
+            [NamedActorRole.Creator, NamedActorRole.Contributor],
         );
 
         // Use helper method to set signature
@@ -131,7 +132,7 @@ describe('IdentityAssertion Tests', function () {
         // Generate JUMBF box
         const box = constructedAssertion.generateJUMBFBox(claim);
 
-        assert.equal(box.descriptionBox?.label, 'cawg.identity');
+        assert.equal(box.descriptionBox?.label, AssertionLabels.identity);
         assert.deepEqual(box.descriptionBox?.uuid, raw.UUIDs.cborAssertion);
         assert.equal(box.contentBoxes.length, 1);
         assert.ok(box.contentBoxes[0] instanceof CBORBox);
@@ -140,9 +141,9 @@ describe('IdentityAssertion Tests', function () {
         const readBackAssertion = new IdentityAssertion();
         readBackAssertion.readFromJUMBF(box, claim);
 
-        assert.equal(readBackAssertion.label, 'cawg.identity');
+        assert.equal(readBackAssertion.label, AssertionLabels.identity);
         assert.equal(readBackAssertion.signerPayload.sig_type, SignatureType.X509Cose);
-        assert.deepEqual(readBackAssertion.signerPayload.role, ['cawg.creator', 'cawg.contributor']);
+        assert.deepEqual(readBackAssertion.signerPayload.role, [NamedActorRole.Creator, NamedActorRole.Contributor]);
         assert.equal(readBackAssertion.signerPayload.referenced_assertions.length, 1);
         assert.equal(
             readBackAssertion.signerPayload.referenced_assertions[0].url,
@@ -191,7 +192,7 @@ describe('IdentityAssertion Tests', function () {
                 },
             ],
             SignatureType.X509Cose,
-            ['cawg.editor'],
+            [NamedActorRole.Editor],
             {
                 expectedPartialClaim,
                 expectedClaimGenerator,
@@ -243,7 +244,7 @@ describe('IdentityAssertion Tests', function () {
     it('should throw error for missing signer_payload', function () {
         const invalidBox = new SuperBox();
         invalidBox.descriptionBox = new DescriptionBox();
-        invalidBox.descriptionBox.label = 'cawg.identity';
+        invalidBox.descriptionBox.label = AssertionLabels.identity;
         invalidBox.descriptionBox.uuid = raw.UUIDs.cborAssertion;
 
         const cborBox = new CBORBox();
@@ -262,7 +263,7 @@ describe('IdentityAssertion Tests', function () {
     it('should throw error for missing signature', function () {
         const invalidBox = new SuperBox();
         invalidBox.descriptionBox = new DescriptionBox();
-        invalidBox.descriptionBox.label = 'cawg.identity';
+        invalidBox.descriptionBox.label = AssertionLabels.identity;
         invalidBox.descriptionBox.uuid = raw.UUIDs.cborAssertion;
 
         const cborBox = new CBORBox();
@@ -284,7 +285,7 @@ describe('IdentityAssertion Tests', function () {
     it('should throw error for missing pad1', function () {
         const invalidBox = new SuperBox();
         invalidBox.descriptionBox = new DescriptionBox();
-        invalidBox.descriptionBox.label = 'cawg.identity';
+        invalidBox.descriptionBox.label = AssertionLabels.identity;
         invalidBox.descriptionBox.uuid = raw.UUIDs.cborAssertion;
 
         const cborBox = new CBORBox();
@@ -306,7 +307,7 @@ describe('IdentityAssertion Tests', function () {
     it('should throw error for invalid box type', function () {
         const invalidBox = new SuperBox();
         invalidBox.descriptionBox = new DescriptionBox();
-        invalidBox.descriptionBox.label = 'cawg.identity';
+        invalidBox.descriptionBox.label = AssertionLabels.identity;
         invalidBox.descriptionBox.uuid = raw.UUIDs.jsonAssertion; // Wrong UUID
 
         const cborBox = new CBORBox();
