@@ -1,21 +1,14 @@
+/* eslint-disable prettier/prettier */
 import assert from 'node:assert/strict';
 import { describe, it } from 'bun:test';
 import type { DIDDocument } from 'did-resolver';
 import { JsonWebKey as DidResolverJsonWebKey } from 'did-resolver';
-import {
-    createIcaCredential,
-    didResolver,
-    NamedActorRole,
-    SignatureType,
-    SUPPORTED_DID_METHODS,
-    validateIcaCredential,
-    VerifiedIdentityType,
-    type SignerPayloadMap,
-} from '../../src/cawg';
+import { didResolver, IdentityClaimsAggregation, NamedActorRole, SignatureType, SUPPORTED_DID_METHODS, VerifiedIdentityType, type SignerPayloadMap } from '../../src/cawg';
+import { IdentityClaimsAggregationValidator } from '../../src/cawg/identity-claims-aggregation-validator';
 import { CoseAlgorithmIdentifier } from '../../src/cose';
 import { SigStructure } from '../../src/cose/SigStructure';
 import { CBORBox } from '../../src/jumbf';
-import { AssertionLabels, ValidationStatusCode } from '../../src/manifest';
+import { AssertionLabels, ValidationResult, ValidationStatusCode } from '../../src/manifest';
 
 
 type SupportedDidMethod = (typeof SUPPORTED_DID_METHODS)[number];
@@ -236,7 +229,7 @@ function makeSignerPayload(): SignerPayloadMap {
     };
 }
 
-function failedCodes(result: Awaited<ReturnType<typeof validateIcaCredential>>): ValidationStatusCode[] {
+function failedCodes(result: ValidationResult): ValidationStatusCode[] {
     return result.statusEntries.filter(entry => !entry.success).map(entry => entry.code);
 }
 
@@ -246,7 +239,7 @@ describe('DID validation', () => {
             const fixture = await createFixture(method);
             const signerPayload = makeSignerPayload();
 
-            const credential = createIcaCredential(
+            const credential = IdentityClaimsAggregation.createIcaCredential(
                 fixture.issuerDid,
                 {
                     verifiedIdentities: [
@@ -267,7 +260,12 @@ describe('DID validation', () => {
             const restoreDidResolver = installDidResolverMock(fixture.issuerDid, fixture.didDocument);
 
             try {
-                const result = await validateIcaCredential(coseSign1, signerPayload, AssertionLabels.identity);
+                const icaValidator = new IdentityClaimsAggregationValidator(
+                    coseSign1,
+                    signerPayload,
+                    AssertionLabels.identity,
+                );
+                const result = await icaValidator.validateIcaCredential();
                 const errors = failedCodes(result);
 
                 for (const code of DID_ERROR_CODES) {
@@ -285,7 +283,7 @@ describe('DID validation', () => {
             const fixture = await createFixture(method);
             const signerPayload = makeSignerPayload();
 
-            const credential = createIcaCredential(
+            const credential = IdentityClaimsAggregation.createIcaCredential(
                 fixture.issuerDid,
                 {
                     verifiedIdentities: [
@@ -307,7 +305,12 @@ describe('DID validation', () => {
             const restoreDidResolver = installDidResolverMock(fixture.issuerDid, fixture.didDocument);
 
             try {
-                const result = await validateIcaCredential(tamperedCoseSign1, signerPayload, AssertionLabels.identity);
+                const icaValidator = new IdentityClaimsAggregationValidator(
+                    tamperedCoseSign1,
+                    signerPayload,
+                    AssertionLabels.identity,
+                );
+                const result = await icaValidator.validateIcaCredential();
                 const errors = failedCodes(result);
 
                 for (const code of DID_ERROR_CODES) {

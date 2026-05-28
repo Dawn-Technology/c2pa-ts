@@ -1,3 +1,4 @@
+;
 /**
  * CAWG Identity Assertion Types and Interfaces
  * Implementation of the Creator Assertions Working Group (CAWG) specification v1.2
@@ -7,6 +8,7 @@
 
 import { X509Certificate } from '@peculiar/x509';
 import { ValidationOptions } from '../cose';
+
 
 /**
  * Hash algorithm and value map used in various CAWG structures
@@ -163,9 +165,9 @@ export interface C2paAssetBinding {
         hash: string;
     }[];
     /** Signature type */
-    sig_type: string;
+    sig_type: SignatureType;
     /** Optional roles */
-    role?: string[];
+    role?: NamedActorRole[];
     /** Optional expected partial claim */
     expected_partial_claim?: {
         alg: string;

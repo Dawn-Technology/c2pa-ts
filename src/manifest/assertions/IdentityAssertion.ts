@@ -1,4 +1,4 @@
-import { CawgTrustConfiguration, isEmptyOrMissing, NamedActorRole, SignatureType, validateIcaCredential, validateIdentityAssertion } from '../../cawg';
+import { CawgTrustConfiguration, CawgValidator, isEmptyOrMissing, NamedActorRole, SignatureType } from '../../cawg';
 import * as JUMBF from '../../jumbf';
 import { BinaryHelper } from '../../util';
 import { Claim } from '../Claim';
@@ -9,7 +9,6 @@ import { ValidationError } from '../ValidationError';
 import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
 import { AssertionLabels } from './AssertionLabels';
-
 
 /**
  * Hash algorithm and value map used in CAWG identity assertions
@@ -168,8 +167,8 @@ export class IdentityAssertion extends Assertion {
                 'Identity assertion is missing source box reference',
             );
         }
-        result.merge(await validateIdentityAssertion(manifest, this, this.label, this.sourceBox, validationOptions));
-        result.merge(await validateIcaCredential(this.signature, this.signerPayload, this.label, validationOptions));
+        const cawgValidator = new CawgValidator(manifest, this, this.label, this.sourceBox, validationOptions);
+        result.merge(await cawgValidator.validate());
         return result;
     }
 

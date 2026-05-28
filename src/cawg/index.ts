@@ -10,18 +10,20 @@
  */
 
 // Type definitions
-export * from './types.js';
+export * from './types';
 // Utility functions
-export * from './utils.js';
+export * from './utils';
 
 // Validator functions
-export { validateIdentityAssertion, isWellFormedIdentityAssertion } from './validator.js';
+export * from './cawg-validator';
+export * from './identity-assertion-validator';
+export * from './identity-claims-aggregation-validator';
 
 // Did resolver
-export { didResolver } from './did-resolver.js';
+export { didResolver } from './did-resolver';
 
 // Identity Claims Aggregation support
-export { createIcaCredential, validateIcaCredential } from './identity-claims-aggregation.js';
+export * from './identity-claims-aggregation';
 
 /**
  * CAWG specification version implemented by this module

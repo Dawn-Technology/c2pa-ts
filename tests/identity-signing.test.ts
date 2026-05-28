@@ -4,15 +4,14 @@ import { afterAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
 import {
     createDidJwk,
-    createIcaCredential,
     didResolver,
     getSignerPublicJwk,
+    IdentityClaimsAggregation,
     NamedActorRole,
     SignatureType,
     VerifiedIdentity,
     VerifiedIdentityType,
 } from '../src/cawg';
-import { createIcaSignature } from '../src/cawg/identity-claims-aggregation';
 import { Crypto } from '../src/crypto';
 import { CBORBox, SuperBox } from '../src/jumbf';
 import {
@@ -25,7 +24,6 @@ import {
     ValidationStatusCode,
 } from '../src/manifest';
 import { loadTestCertificate, TEST_CERTIFICATES } from './utils/testCertificates';
-
 
 function installDidResolverMock(issuerDid: string, publicJwk: JsonWebKey): () => void {
     const originalResolve = didResolver.resolve.bind(didResolver);
@@ -152,7 +150,8 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
 
                 issuerPublicJwk = await getSignerPublicJwk(signer);
                 issuerDid = createDidJwk(issuerPublicJwk);
-                const icaCredential = createIcaCredential(
+                const ica = new IdentityClaimsAggregation(signer);
+                const icaCredential = IdentityClaimsAggregation.createIcaCredential(
                     issuerDid,
                     {
                         verifiedIdentities: [
@@ -173,7 +172,7 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
                     new Date(),
                 );
 
-                const icaSignature = await createIcaSignature(icaCredential, signer);
+                const icaSignature = await ica.createIcaSignature(icaCredential);
 
                 identityAssertion.setSignature(icaSignature, new Uint8Array(256).fill(0x00), undefined, manifest);
 

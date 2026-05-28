@@ -128,7 +128,31 @@ export function base64ToBytes(base64: string | Uint8Array): Uint8Array {
     } else {
         base64String = base64;
     }
-    return Uint8Array.from(Buffer.from(base64String, 'base64'));
+
+    interface GlobalWithBuffer {
+        Buffer?: {
+            from: (input: string, encoding: 'base64') => Uint8Array;
+        };
+    }
+    const bufferCtor = (globalThis as GlobalWithBuffer).Buffer;
+    if (bufferCtor?.from) {
+        return new Uint8Array(bufferCtor.from(base64String, 'base64'));
+    }
+
+    if (typeof globalThis.atob === 'function') {
+        const binary = globalThis.atob(base64String);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+    }
+
+    throw new Error('No base64 decoder available in this runtime');
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+    return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 /**
@@ -371,6 +395,6 @@ export async function getSignerPublicJwk(signer: Signer): Promise<JsonWebKey> {
 export function createDidJwk(publicJwk: JsonWebKey): string {
     // did:jwk requires a base64url-encoded JSON JWK as method-specific identifier.
     const canonicalJwk = Object.fromEntries(Object.entries(publicJwk).sort(([a], [b]) => a.localeCompare(b)));
-    const didPayload = Buffer.from(JSON.stringify(canonicalJwk), 'utf8').toString('base64url');
+    const didPayload = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(canonicalJwk)));
     return `did:jwk:${didPayload}`;
 }
