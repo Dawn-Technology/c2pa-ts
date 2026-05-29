@@ -169,6 +169,7 @@ export class IdentityAssertion extends Assertion {
         }
         const cawgValidator = new CawgValidator(manifest, this, this.label, this.sourceBox, validationOptions);
         result.merge(await cawgValidator.validate());
+
         return result;
     }
 

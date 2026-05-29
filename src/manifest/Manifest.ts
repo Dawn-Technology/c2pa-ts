@@ -12,19 +12,10 @@ import { Claim } from './Claim';
 import { ManifestStore } from './ManifestStore';
 import * as raw from './rawTypes';
 import { Signature } from './Signature';
-import {
-    Action,
-    ActionType,
-    ClaimVersion,
-    HashedURI,
-    ManifestComponent,
-    ManifestComponentType,
-    ManifestType,
-    RelationshipType,
-    ValidationStatusCode,
-} from './types';
+import { Action, ActionType, ClaimVersion, HashedURI, ManifestComponent, ManifestComponentType, ManifestType, RelationshipType, ValidationStatusCode } from './types';
 import { ValidationError } from './ValidationError';
 import { ValidationResult } from './ValidationResult';
+
 
 export class Manifest implements ManifestComponent {
     public label?: string;
@@ -309,6 +300,9 @@ export class Manifest implements ManifestComponent {
             }
         }
 
+        // Validate identity assertions
+        result.merge(await this.validateIdentityAssertions(validationOptions));
+
         // Only process asset data if everything has been validated so far
         if (!result.isValid) return result;
 
@@ -319,9 +313,6 @@ export class Manifest implements ManifestComponent {
 
         result.merge(await this.validateManifestRelationships());
         result.merge(await this.validateIngredients());
-
-        // TODO: Move to correct location in multistep validation process
-        result.merge(await this.validateIdentityAssertions(validationOptions));
 
         return result;
     }
