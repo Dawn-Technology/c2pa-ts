@@ -44,10 +44,6 @@
     "./rfc3161": {
       "types": "./dist/rfc3161/index.d.ts",
       "import": "./dist/rfc3161/index.js"
-    },
-    "./cawg": {
-      "types": "./dist/cawg/index.d.ts",
-      "import": "./dist/cawg/index.js"
     }
   },
   "files": [
@@ -81,7 +77,6 @@
   "dependencies": {
     "@noble/hashes": "^2.0.1",
     "@peculiar/x509": "^1.14.3",
-    "@sphereon/ssi-sdk-ext.did-resolver-jwk": "^0.37.1",
     "cbor-x": "^1.6.0",
     "crc-32": "^1.2.2",
     "did-resolver": "^4.1.0",

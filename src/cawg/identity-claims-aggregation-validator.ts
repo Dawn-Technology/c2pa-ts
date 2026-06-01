@@ -125,7 +125,6 @@ export class IdentityClaimsAggregationValidator {
 
             // Step 5: Obtain issuer's public key via DID resolution
             const issuerDid = this.extractIssuerDid(credential);
-
             if (issuerDid?.split(':')[0] !== 'did') {
                 this.result.addError(
                     ValidationStatusCode.IcaInvalidIssuer,
@@ -739,7 +738,6 @@ export class IdentityClaimsAggregationValidator {
     validateC2paAssetBinding(c2paAsset: C2paAssetBinding): void {
         // Convert and compare
         const convertedPayload = c2paAssetBindingToSignerPayload(c2paAsset);
-
         if (JSON.stringify(convertedPayload) !== JSON.stringify(this.signerPayload)) {
             this.result.addError(
                 ValidationStatusCode.IcaSignerPayloadMismatch,

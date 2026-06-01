@@ -20,6 +20,11 @@ interface DidFixture {
     sign: (payload: Uint8Array) => Promise<Uint8Array>;
 }
 
+interface ResolverFixture {
+    did: string;
+    publicJwk: JsonWebKey;
+}
+
 const DID_ERROR_CODES = [
     ValidationStatusCode.IcaInvalidIssuer,
     ValidationStatusCode.IcaDidUnsupportedMethod,
@@ -61,6 +66,54 @@ function toBase58(bytes: Uint8Array): string {
     }
 
     return encoded || '1';
+}
+
+function createDidKeyFromPublicKeyBytes(publicKeyBytes: Uint8Array): string {
+    // did:key for Ed25519 uses multicodec prefix 0xed01 before base58btc encoding.
+    const prefixedKeyBytes = new Uint8Array(2 + publicKeyBytes.length);
+    prefixedKeyBytes[0] = 0xed;
+    prefixedKeyBytes[1] = 0x01;
+    prefixedKeyBytes.set(publicKeyBytes, 2);
+    return `did:key:z${toBase58(prefixedKeyBytes)}`;
+}
+
+async function createResolverFixture(method: Exclude<SupportedDidMethod, 'did:web'>): Promise<ResolverFixture> {
+    if (method === 'did:key') {
+        const keyPair = await crypto.subtle.generateKey(
+            {
+                name: 'Ed25519',
+            },
+            true,
+            ['sign', 'verify'],
+        );
+
+        const publicJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+        const x = publicJwk.x;
+
+        if (!x) {
+            throw new Error('Missing x coordinate on Ed25519 JWK');
+        }
+
+        return {
+            did: createDidKeyFromPublicKeyBytes(base64UrlToBytes(x)),
+            publicJwk,
+        };
+    }
+
+    const keyPair = await crypto.subtle.generateKey(
+        {
+            name: 'ECDSA',
+            namedCurve: 'P-256',
+        },
+        true,
+        ['sign', 'verify'],
+    );
+    const publicJwk = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
+
+    return {
+        did: createDidJwk(publicJwk),
+        publicJwk,
+    };
 }
 
 async function createEcFixture(method: 'did:web' | 'did:jwk'): Promise<DidFixture> {
@@ -233,6 +286,37 @@ function failedCodes(result: ValidationResult): ValidationStatusCode[] {
     return result.statusEntries.filter(entry => !entry.success).map(entry => entry.code);
 }
 
+describe('DID resolver (no mock)', () => {
+    for (const method of SUPPORTED_DID_METHODS.filter(
+        (candidate): candidate is Exclude<SupportedDidMethod, 'did:web'> => candidate !== 'did:web',
+    )) {
+        it(`resolves ${method} using real did resolver`, async () => {
+            const fixture = await createResolverFixture(method);
+            const result = await didResolver.resolve(fixture.did);
+
+            assert.ok(!result.didResolutionMetadata.error, result.didResolutionMetadata.error);
+            assert.ok(result.didDocument, 'expected DID document from resolver');
+            assert.equal(result.didDocument?.id, fixture.did);
+
+            const verificationMethods = result.didDocument?.verificationMethod;
+            assert.ok(Array.isArray(verificationMethods) && verificationMethods.length > 0);
+
+            if (method === 'did:key') {
+                assert.ok(
+                    verificationMethods.some(vm => 'publicKeyBase58' in vm || 'publicKeyMultibase' in vm),
+                    'expected did:key verification method with key material',
+                );
+            } else {
+                const didJwkMethod = verificationMethods.find(
+                    vm => 'publicKeyJwk' in vm && typeof vm.publicKeyJwk === 'object' && vm.publicKeyJwk,
+                );
+                assert.ok(didJwkMethod, 'expected did:jwk verification method with publicKeyJwk');
+                assert.equal((didJwkMethod.publicKeyJwk as JsonWebKey).kty, fixture.publicJwk.kty);
+            }
+        });
+    }
+});
+
 describe('DID validation', () => {
     for (const method of SUPPORTED_DID_METHODS) {
         it(`validates issuer DID resolution and signature for ${method}`, async () => {
@@ -325,5 +409,7 @@ describe('DID validation', () => {
                 restoreDidResolver();
             }
         });
+
+        
     }
 });

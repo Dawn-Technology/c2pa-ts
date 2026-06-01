@@ -10,6 +10,7 @@ import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
 import { AssertionLabels } from './AssertionLabels';
 
+
 /**
  * Hash algorithm and value map used in CAWG identity assertions
  */
@@ -120,16 +121,13 @@ export class IdentityAssertion extends Assertion {
             );
 
         this.signerPayload = {
+            ...rawContent.signer_payload,
             referenced_assertions: rawContent.signer_payload.referenced_assertions.map(refAssertion => ({
                 url: refAssertion.url,
                 alg: refAssertion.alg,
                 hash: refAssertion.hash,
             })),
             sig_type: rawContent.signer_payload.sig_type,
-            role: rawContent.signer_payload.role,
-            expected_partial_claim: rawContent.signer_payload.expected_partial_claim,
-            expected_claim_generator: rawContent.signer_payload.expected_claim_generator,
-            expected_countersigners: rawContent.signer_payload.expected_countersigners,
         };
 
         this.signature = rawContent.signature;
