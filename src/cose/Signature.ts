@@ -1,18 +1,9 @@
 import { AsnConvert } from '@peculiar/asn1-schema';
 import { Certificate as ASN1Certificate, Version as ASN1Version } from '@peculiar/asn1-x509';
-import {
-    AuthorityKeyIdentifierExtension,
-    BasicConstraintsExtension,
-    ExtendedKeyUsage,
-    ExtendedKeyUsageExtension,
-    KeyUsageFlags,
-    KeyUsagesExtension,
-    SubjectKeyIdentifierExtension,
-    X509Certificate,
-} from '@peculiar/x509';
+import { AuthorityKeyIdentifierExtension, BasicConstraintsExtension, ExtendedKeyUsage, ExtendedKeyUsageExtension, KeyUsageFlags, KeyUsagesExtension, SubjectKeyIdentifierExtension, X509Certificate } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
-import { CawgValidationOptions } from '../cawg';
+import { bytesToBase64, CawgValidationOptions } from '../cawg';
 import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
@@ -23,15 +14,8 @@ import { Algorithms, CoseAlgorithm } from './Algorithms';
 import { Signer } from './Signer';
 import { SigStructure } from './SigStructure';
 import { TrustList } from './TrustList';
-import {
-    AdditionalEKU,
-    CoseSignature,
-    ProtectedBucket,
-    TimestampToken,
-    TimestampVersion,
-    TstContainer,
-    UnprotectedBucket,
-} from './types';
+import { AdditionalEKU, CoseSignature, ProtectedBucket, TimestampToken, TimestampVersion, TstContainer, UnprotectedBucket } from './types';
+
 
 /**
  * Options for signature validation.
@@ -710,16 +694,19 @@ export class Signature {
             });
 
             if (!issuer) {
+                // await Signature.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
 
             // Signature check and validate certificate and timestamp for the issuer
             if (!(await Signature.validateChainCertificate(current, issuer, timestamp))) {
+                // await Signature.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
 
             // Loop detection
             if (seen.has(issuer)) {
+                // await Signature.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
             seen.add(issuer);
@@ -756,5 +743,27 @@ export class Signature {
         }
 
         return true;
+    }
+    private static async printPublicKeys(certificates: Set<X509Certificate>) {
+        for (const cert of certificates) {
+            await Signature.printPublicKey(cert);
+        }
+    }
+    private static async printPublicKey(certificate: X509Certificate) {
+        try {
+            // const boe = certificate.publicKey as unknown as CryptoKey;
+            // const spki = await crypto.subtle.exportKey('spki', boe);
+            const spki = certificate.rawData;
+            // 2. Converteer naar base64
+            // const base64Cert = Buffer.from(spki).toString('base64');
+            const base64Cert = bytesToBase64(new Uint8Array(spki));
+            // 3. Voeg line breaks elke 64 tekens (PEM standaard)
+            const pem = base64Cert.match(/.{1,64}/g)?.join('\n');
+            // 4. Voeg de PEM headers toe
+            const pemString = `-----BEGIN PUBLIC KEY-----\n${pem}\n-----END PUBLIC KEY-----`;
+            console.debug(pemString);
+        } catch (e) {
+            console.debug('Failed to print public key for debugging:', e);
+        }
     }
 }
