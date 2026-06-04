@@ -12,6 +12,7 @@ import {
 } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
+import { CawgValidationOptions } from '../cawg';
 import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
@@ -31,7 +32,6 @@ import {
     TstContainer,
     UnprotectedBucket,
 } from './types';
-import { CawgValidationOptions } from '../cawg';
 
 /**
  * Options for signature validation.
@@ -533,7 +533,7 @@ export class Signature {
         return result;
     }
 
-    private static async validateCertificate(
+    public static async validateCertificate(
         certificate: X509Certificate,
         validityTimestamp: Date,
         isUsedForManifestSigning: boolean,
