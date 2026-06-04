@@ -132,7 +132,7 @@ export class ManifestStore {
      * Validates the active manifest
      * @param asset Asset for validation of bindings
      * // TODO: Consider moving the options to a service instead of passing through the manifest store and manifest layers
-     * @param validationOptions Validation options for identity assertions
+     * @param validationOptions Validation options for C2PA and CAWG
      */
     public async validate(asset: Asset, validationOptions?: CawgValidationOptions): Promise<ValidationResult> {
         const activeManifest = this.getActiveManifest();

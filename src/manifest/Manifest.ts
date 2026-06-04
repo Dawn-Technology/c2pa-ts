@@ -12,10 +12,19 @@ import { Claim } from './Claim';
 import { ManifestStore } from './ManifestStore';
 import * as raw from './rawTypes';
 import { Signature } from './Signature';
-import { Action, ActionType, ClaimVersion, HashedURI, ManifestComponent, ManifestComponentType, ManifestType, RelationshipType, ValidationStatusCode } from './types';
+import {
+    Action,
+    ActionType,
+    ClaimVersion,
+    HashedURI,
+    ManifestComponent,
+    ManifestComponentType,
+    ManifestType,
+    RelationshipType,
+    ValidationStatusCode,
+} from './types';
 import { ValidationError } from './ValidationError';
 import { ValidationResult } from './ValidationResult';
-
 
 export class Manifest implements ManifestComponent {
     public label?: string;
