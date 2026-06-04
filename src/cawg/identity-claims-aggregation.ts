@@ -4,8 +4,7 @@
  *
  * @module cawg/identity-claims-aggregation
  */
-
-import { Signer } from '../cose';
+import { LocalIdentitySigner, Signer } from '../cose';
 import { SigStructure } from '../cose/SigStructure';
 import { CBORBox } from '../jumbf';
 import {
@@ -20,9 +19,9 @@ import {
 import { signerPayloadToC2paAssetBinding } from './utils.js';
 
 export class IdentityClaimsAggregation {
-    signer: Signer;
+    signer: LocalIdentitySigner | Signer;
 
-    constructor(signer: Signer) {
+    constructor(signer: LocalIdentitySigner | Signer) {
         this.signer = signer;
     }
 

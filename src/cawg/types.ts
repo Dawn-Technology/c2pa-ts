@@ -1,4 +1,3 @@
-;
 /**
  * CAWG Identity Assertion Types and Interfaces
  * Implementation of the Creator Assertions Working Group (CAWG) specification v1.2
@@ -8,7 +7,6 @@
 
 import { X509Certificate } from '@peculiar/x509';
 import { ValidationOptions } from '../cose';
-
 
 /**
  * Hash algorithm and value map used in various CAWG structures
@@ -314,7 +312,7 @@ export interface StatusList2021Entry extends CredentialStatus {
 }
 
 /**
- * COSE header labels volgens RFC 8152
+ * COSE header labels according RFC 8152
  * 1  = alg
  * 3  = content type
  * 33 = x5chain

@@ -3,9 +3,6 @@ import * as fs from 'node:fs/promises';
 import { afterAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
 import {
-    createDidJwk,
-    didResolver,
-    getSignerPublicJwk,
     IdentityClaimsAggregation,
     NamedActorRole,
     SignatureType,
@@ -23,38 +20,7 @@ import {
     ManifestStore,
     ValidationStatusCode,
 } from '../src/manifest';
-import { loadTestCertificate, TEST_CERTIFICATES } from './utils/testCertificates';
-
-function installDidResolverMock(issuerDid: string, publicJwk: JsonWebKey): () => void {
-    const originalResolve = didResolver.resolve.bind(didResolver);
-    didResolver.resolve = (async (did: string) => {
-        if (did !== issuerDid) {
-            return originalResolve(did);
-        }
-
-        const methodId = `${issuerDid}#key-1`;
-        return {
-            didDocument: {
-                id: issuerDid,
-                verificationMethod: [
-                    {
-                        id: methodId,
-                        type: 'JsonWebKey2020',
-                        controller: issuerDid,
-                        publicKeyJwk: publicJwk,
-                    },
-                ],
-                assertionMethod: [methodId],
-            },
-            didResolutionMetadata: {},
-            didDocumentMetadata: {},
-        };
-    }) as typeof didResolver.resolve;
-
-    return () => {
-        didResolver.resolve = originalResolve;
-    };
-}
+import { loadIdentitySigner, loadTestCertificate, TEST_CERTIFICATES, TEST_IDENTITIES } from './utils/testCertificates';
 
 // Location of the image to sign with identity assertion
 const sourceFile = 'tests/fixtures/dawn-technology-icon.jpg';
@@ -65,7 +31,6 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
         describe(`using ${certificate.name}`, function () {
             let manifest: Manifest | undefined;
             let issuerDid: string | undefined;
-            let issuerPublicJwk: JsonWebKey | undefined;
 
             it('add a manifest with ICA (identity claims aggregation) to a JPEG test file', async function () {
                 const { signer, timestampProvider } = await loadTestCertificate(certificate);
@@ -148,9 +113,9 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
                     [NamedActorRole.Creator],
                 );
 
-                issuerPublicJwk = await getSignerPublicJwk(signer);
-                issuerDid = createDidJwk(issuerPublicJwk);
-                const ica = new IdentityClaimsAggregation(signer);
+                const localSigner = await loadIdentitySigner(TEST_IDENTITIES[0]);
+                const ica = new IdentityClaimsAggregation(localSigner);
+                issuerDid = 'did:jwk:' + (await localSigner.getJwk());
                 const icaCredential = IdentityClaimsAggregation.createIcaCredential(
                     issuerDid,
                     {
@@ -173,7 +138,6 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
                 );
 
                 const icaSignature = await ica.createIcaSignature(icaCredential);
-
                 identityAssertion.setSignature(icaSignature, new Uint8Array(256).fill(0x00), undefined, manifest);
 
                 // Create the manifest signature
@@ -272,13 +236,7 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
                 assert.deepEqual(identityAssertion.signerPayload.role, [NamedActorRole.Creator]);
                 assert.equal(identityAssertion.signerPayload.referenced_assertions.length, 1);
 
-                // Verify the manifest signature
-                if (!issuerDid || !issuerPublicJwk) {
-                    throw new Error('Missing mocked DID issuer data for validation');
-                }
-                const restoreDidResolver = installDidResolverMock(issuerDid, issuerPublicJwk);
                 const validationResult = await manifestStore.validate(asset);
-                restoreDidResolver();
 
                 // Check overall validity
                 assert.ok(validationResult.isValid, 'Validation result invalid');

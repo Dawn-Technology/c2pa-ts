@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import { X509Certificate } from '@peculiar/x509';
-import { CoseAlgorithmIdentifier, LocalSigner, Signer } from '../../src/cose';
+import { CoseAlgorithmIdentifier, LocalIdentitySigner, LocalSigner, Signer } from '../../src/cose';
 import { ValidationStatusCode } from '../../src/manifest';
 import { LocalTimestampProvider } from '../../src/rfc3161';
 import { setTrustList } from './set-trust-list';
@@ -11,6 +11,12 @@ export interface TestCertificate {
     privateKeyFile: string;
     algorithm: CoseAlgorithmIdentifier;
     trustListFile?: string;
+}
+
+export interface TestIdentity {
+    name: string;
+    privateKeyFile: string;
+    algorithm: CoseAlgorithmIdentifier;
 }
 
 export const TEST_CERTIFICATES: TestCertificate[] = [
@@ -24,6 +30,14 @@ export const TEST_CERTIFICATES: TestCertificate[] = [
         name: 'Ed25519 sample certificate',
         certificateFile: 'tests/fixtures/sample_ed25519.pem',
         privateKeyFile: 'tests/fixtures/sample_ed25519.key',
+        algorithm: CoseAlgorithmIdentifier.Ed25519,
+    },
+];
+
+export const TEST_IDENTITIES: TestIdentity[] = [
+    {
+        name: 'Ed25519 sample identity',
+        privateKeyFile: 'tests/fixtures/identity/sample_ed25519.pem',
         algorithm: CoseAlgorithmIdentifier.Ed25519,
     },
 ];
@@ -53,6 +67,25 @@ export async function loadTestCertificate(certificateInfo: TestCertificate): Pro
     // Set trust list
     await setTrustList(certificateInfo.trustListFile);
     return { signer, timestampProvider };
+}
+
+export async function loadIdentitySigner(testIdentityInfo: TestIdentity): Promise<LocalIdentitySigner> {
+    // Load and parse the private key
+    const privateKeyData = (await fs.readFile(testIdentityInfo.privateKeyFile)).toString();
+    const beginMatch = /-----BEGIN [^-]+-----/.exec(privateKeyData);
+    const endMatch = /-----END [^-]+-----/.exec(privateKeyData);
+
+    if (!beginMatch || !endMatch) {
+        throw new Error('Invalid PEM format: missing BEGIN or END marker');
+    }
+
+    const base64 = privateKeyData
+        .replace(/-----BEGIN [^-]+-----/, '')
+        .replace(/-----END [^-]+-----/, '')
+        .replace(/\s/g, '');
+
+    const privateKey = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    return new LocalIdentitySigner(privateKey, testIdentityInfo.algorithm);
 }
 
 // Helper function to generate expected validation status entries for signing tests

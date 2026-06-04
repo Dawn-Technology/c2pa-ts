@@ -1,6 +1,15 @@
 import { AsnConvert } from '@peculiar/asn1-schema';
 import { Certificate as ASN1Certificate, Version as ASN1Version } from '@peculiar/asn1-x509';
-import { AuthorityKeyIdentifierExtension, BasicConstraintsExtension, ExtendedKeyUsage, ExtendedKeyUsageExtension, KeyUsageFlags, KeyUsagesExtension, SubjectKeyIdentifierExtension, X509Certificate } from '@peculiar/x509';
+import {
+    AuthorityKeyIdentifierExtension,
+    BasicConstraintsExtension,
+    ExtendedKeyUsage,
+    ExtendedKeyUsageExtension,
+    KeyUsageFlags,
+    KeyUsagesExtension,
+    SubjectKeyIdentifierExtension,
+    X509Certificate,
+} from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
 import { bytesToBase64, CawgValidationOptions } from '../cawg';
@@ -14,8 +23,15 @@ import { Algorithms, CoseAlgorithm } from './Algorithms';
 import { Signer } from './Signer';
 import { SigStructure } from './SigStructure';
 import { TrustList } from './TrustList';
-import { AdditionalEKU, CoseSignature, ProtectedBucket, TimestampToken, TimestampVersion, TstContainer, UnprotectedBucket } from './types';
-
+import {
+    AdditionalEKU,
+    CoseSignature,
+    ProtectedBucket,
+    TimestampToken,
+    TimestampVersion,
+    TstContainer,
+    UnprotectedBucket,
+} from './types';
 
 /**
  * Options for signature validation.

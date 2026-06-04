@@ -685,8 +685,9 @@ describe('Certificate Chain Validation', () => {
         });
 
         it('should detect not-yet-valid leaf certificate', async () => {
+            const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
-                notBefore: new Date(Date.now() + 1000), // not valid yet
+                notBefore: tomorrow, // not valid yet
             });
 
             // Create timestamp provider

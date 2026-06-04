@@ -124,7 +124,7 @@ export class IdentityClaimsAggregationValidator {
             this.validateIcaCredentialStructure(credential);
 
             // Step 5: Obtain issuer's public key via DID resolution
-            const issuerDid = this.extractIssuerDid(credential);
+            const issuerDid = this.getIssuerDid(credential);
             if (issuerDid?.split(':')[0] !== 'did') {
                 this.result.addError(
                     ValidationStatusCode.IcaInvalidIssuer,
@@ -278,6 +278,17 @@ export class IdentityClaimsAggregationValidator {
                 'Missing required credential types',
             );
         }
+    }
+
+    getIssuerDid(credential: IdentityClaimsAggregationCredential): string | null {
+        const did = this.extractIssuerDid(credential);
+
+        // If the DID is a did:jwk, we need to remove the padding because the resolver does not accept the = character in the METHOD_ID
+        // This is a workaround for the fact that some producers include the padding while others do not.
+        if (did?.startsWith('did:jwk:')) {
+            return did.replace(/=/g, '');
+        }
+        return did;
     }
 
     extractIssuerDid(credential: IdentityClaimsAggregationCredential): string | null {
@@ -738,6 +749,26 @@ export class IdentityClaimsAggregationValidator {
     validateC2paAssetBinding(c2paAsset: C2paAssetBinding): void {
         // Convert and compare
         const convertedPayload = c2paAssetBindingToSignerPayload(c2paAsset);
+
+        // Some real world signers do not following the specs by neglecting the algorthme value.
+        // To avoid breaking existing credentials, we ignore the alg value in the signer payload if it is missing, but add an informational message to the validation result to indicate that this deviation from the spec was detected.
+        if (convertedPayload.referenced_assertions && this.signerPayload.referenced_assertions) {
+            for (let i = 0; i < convertedPayload.referenced_assertions.length; i++) {
+                const convertedAssertion = convertedPayload.referenced_assertions[i];
+                const signerAssertion = this.signerPayload.referenced_assertions[i];
+
+                // If converted payload lacks 'alg' but signer payload has it, remove it for comparison
+                if (
+                    signerAssertion &&
+                    (!('alg' in signerAssertion) || !signerAssertion.alg) &&
+                    convertedAssertion &&
+                    'alg' in convertedAssertion
+                ) {
+                    signerAssertion.alg = convertedAssertion.alg;
+                }
+            }
+        }
+
         if (JSON.stringify(convertedPayload) !== JSON.stringify(this.signerPayload)) {
             this.result.addError(
                 ValidationStatusCode.IcaSignerPayloadMismatch,
