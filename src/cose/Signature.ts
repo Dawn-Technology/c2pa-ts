@@ -31,6 +31,7 @@ import {
     TstContainer,
     UnprotectedBucket,
 } from './types';
+import { CawgValidationOptions } from '../cawg';
 
 /**
  * Options for signature validation.
