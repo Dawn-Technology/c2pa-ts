@@ -376,13 +376,7 @@ export const SUPPORTED_DID_METHODS = ['did:web', 'did:key', 'did:jwk'] as const;
 /**
  * Supported DID verification methods
  */
-export const SUPPORTED_VERIFICATION_METHODS = [
-    'JsonWebKey',
-    'JsonWebKey2020',
-    'Ed25519VerificationKey2018',
-    'Ed25519VerificationKey2020',
-    'EcdsaSecp256k1VerificationKey2019',
-] as const;
+export const SUPPORTED_VERIFICATION_METHODS = ['JsonWebKey', 'JsonWebKey2020', 'Ed25519VerificationKey2018'] as const;
 
 /**
  * Supported COSE algorithms for ICA

@@ -4,24 +4,25 @@
  *
  * @module cawg/identity-claims-aggregation
  */
-import { LocalIdentitySigner, Signer } from '../cose';
+import { Signer } from '../cose';
 import { SigStructure } from '../cose/SigStructure';
 import { CBORBox } from '../jumbf';
+import { IdentitySigner } from './identity-signer';
 import {
     SCHEMA_URL,
     VC_CONTEXT,
     VC_TYPE,
+    VerifiedIdentity,
     type CredentialStatus,
-    type IdentityClaimsCredentialSubject,
     type SignerPayloadMap,
     type VerifiableCredential,
 } from './types.js';
 import { signerPayloadToC2paAssetBinding } from './utils.js';
 
 export class IdentityClaimsAggregation {
-    signer: LocalIdentitySigner | Signer;
+    signer: IdentitySigner | Signer;
 
-    constructor(signer: LocalIdentitySigner | Signer) {
+    constructor(signer: IdentitySigner | Signer) {
         this.signer = signer;
     }
 
@@ -29,7 +30,7 @@ export class IdentityClaimsAggregation {
      * Create an Identity Claims Aggregation credential
      *
      * @param issuer - DID of the identity claims aggregator
-     * @param subject - Credential subject including verified identities
+     * @param verifiedIdentities - Array of verified identities
      * @param signerPayload - The signer_payload to bind to C2PA asset
      * @param validFrom - Valid from date
      * @param options - Additional options
@@ -37,7 +38,7 @@ export class IdentityClaimsAggregation {
      */
     static createIcaCredential(
         issuer: string,
-        subject: Omit<IdentityClaimsCredentialSubject, 'c2paAsset'>,
+        verifiedIdentities: VerifiedIdentity | VerifiedIdentity[],
         signerPayload: SignerPayloadMap,
         validFrom: Date,
         options?: {
@@ -56,7 +57,7 @@ export class IdentityClaimsAggregation {
             type: [VC_TYPE.Verifiable, VC_TYPE.IdentityClaimsAggregation],
             issuer,
             credentialSubject: {
-                ...subject,
+                verifiedIdentities: Array.isArray(verifiedIdentities) ? verifiedIdentities : [verifiedIdentities],
                 c2paAsset: c2paAssetBinding,
             },
             credentialSchema: [

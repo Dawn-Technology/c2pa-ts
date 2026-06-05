@@ -1,9 +1,17 @@
+import { NamedActorRole, SignatureType, VerifiedIdentity } from '../cawg';
 import { bytesToBase64Url, privateJwkToPublicJwk } from '../cawg/utils';
+import { CoseAlgorithmIdentifier } from '../cose/Algorithms';
 import { Crypto, ECDSASigningAlgorithm, Ed25519SigningAlgorithm, RSASigningAlgorithm } from '../crypto';
-import { CoseAlgorithmIdentifier } from './Algorithms';
-import { Signer } from './Signer';
+import { IdentitySigner } from './identity-signer';
 
-export class LocalIdentitySigner implements Omit<Signer, 'certificate' | 'chainCertificates'> {
+export interface LocalIdentitySignerOptions {
+    readonly verifiedIdentity: VerifiedIdentity | VerifiedIdentity[];
+    readonly roles: NamedActorRole[];
+    readonly sigType?: SignatureType;
+    readonly issuerDid?: string;
+}
+
+export class LocalIdentitySigner implements IdentitySigner {
     get signingAlgorithm(): ECDSASigningAlgorithm | RSASigningAlgorithm | Ed25519SigningAlgorithm {
         switch (this.algorithm) {
             case CoseAlgorithmIdentifier.ES256:
@@ -24,21 +32,42 @@ export class LocalIdentitySigner implements Omit<Signer, 'certificate' | 'chainC
         }
     }
 
+    get issuerDid(): Promise<string> {
+        if (this.options.issuerDid) {
+            return Promise.resolve(this.options.issuerDid);
+        } else {
+            return this.getDefaultDid();
+        }
+    }
+
+    get verifiedIdentity(): VerifiedIdentity | VerifiedIdentity[] {
+        return this.options.verifiedIdentity;
+    }
+
+    get roles(): NamedActorRole[] {
+        return this.options.roles;
+    }
+
+    get signatureType(): SignatureType {
+        return this.options.sigType ?? SignatureType.IdentityClaimsAggregation;
+    }
+
     /**
      * Creates a signer instance using a private key.
      * @param privateKey - Private key in PKCS#8 format
      * @param signingAlgorithm – algorithm identifier
      */
-    public constructor(
+    constructor(
         private readonly privateKey: Uint8Array,
-        public algorithm: CoseAlgorithmIdentifier,
+        readonly algorithm: CoseAlgorithmIdentifier,
+        private readonly options: LocalIdentitySignerOptions,
     ) {}
 
     public sign(payload: Uint8Array): Promise<Uint8Array> {
         return Crypto.sign(payload, this.privateKey, this.signingAlgorithm);
     }
 
-    public async getJwk(): Promise<string> {
+    public async getDefaultDid(): Promise<string> {
         const privateKey = await crypto.subtle.importKey(
             'pkcs8',
             new Uint8Array(this.privateKey),
@@ -49,6 +78,7 @@ export class LocalIdentitySigner implements Omit<Signer, 'certificate' | 'chainC
         const privateJwk = await crypto.subtle.exportKey('jwk', privateKey);
         const publicJwk = privateJwkToPublicJwk(privateJwk);
         const canonicalJwk = Object.fromEntries(Object.entries(publicJwk).sort(([a], [b]) => a.localeCompare(b)));
-        return bytesToBase64Url(new TextEncoder().encode(JSON.stringify(canonicalJwk)));
+        const base64 = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(canonicalJwk)));
+        return `did:jwk:${base64}`;
     }
 }

@@ -326,14 +326,10 @@ describe('DID validation', () => {
             const credential = IdentityClaimsAggregation.createIcaCredential(
                 fixture.issuerDid,
                 {
-                    verifiedIdentities: [
-                        {
-                            type: VerifiedIdentityType.Website,
-                            uri: 'https://issuer.example.com',
-                            provider: { name: 'Example Provider' },
-                            verifiedAt: new Date().toISOString(),
-                        },
-                    ],
+                    type: VerifiedIdentityType.Website,
+                    uri: 'https://issuer.example.com',
+                    provider: { name: 'Example Provider' },
+                    verifiedAt: new Date().toISOString(),
                 },
                 signerPayload,
                 new Date(),
@@ -370,14 +366,10 @@ describe('DID validation', () => {
             const credential = IdentityClaimsAggregation.createIcaCredential(
                 fixture.issuerDid,
                 {
-                    verifiedIdentities: [
-                        {
-                            type: VerifiedIdentityType.Website,
-                            uri: 'https://issuer.example.com',
-                            provider: { name: 'Example Provider' },
-                            verifiedAt: new Date().toISOString(),
-                        },
-                    ],
+                    type: VerifiedIdentityType.Website,
+                    uri: 'https://issuer.example.com',
+                    provider: { name: 'Example Provider' },
+                    verifiedAt: new Date().toISOString(),
                 },
                 signerPayload,
                 new Date(),

@@ -1,5 +1,17 @@
-import { CawgTrustConfiguration, CawgValidator, isEmptyOrMissing, NamedActorRole, SignatureType } from '../../cawg';
+import 'core-js/full/reflect';
+import { Asset } from '../../asset';
+import {
+    CawgTrustConfiguration,
+    CawgValidator,
+    IdentityClaimsAggregation,
+    IdentitySigner,
+    isEmptyOrMissing,
+    NamedActorRole,
+    SignatureType,
+} from '../../cawg';
+import { Signer } from '../../cose';
 import * as JUMBF from '../../jumbf';
+import { LocalTimestampProvider } from '../../rfc3161';
 import { BinaryHelper } from '../../util';
 import { Claim } from '../Claim';
 import { Manifest } from '../Manifest';
@@ -9,7 +21,7 @@ import { ValidationError } from '../ValidationError';
 import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
 import { AssertionLabels } from './AssertionLabels';
-
+import { DataHashAssertion } from './DataHashAssertion';
 
 /**
  * Hash algorithm and value map used in CAWG identity assertions
@@ -229,5 +241,111 @@ export class IdentityAssertion extends Assertion {
         if (finalSize !== targetAssertionSize) {
             throw new Error('Failed to match reserved identity assertion size');
         }
+    }
+
+    public static async create(
+        manifest: Manifest,
+        asset: Asset,
+        signer: Signer,
+        timestampProvider: LocalTimestampProvider,
+        identitySigners: IdentitySigner,
+    ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion }>;
+    public static async create(
+        manifest: Manifest,
+        asset: Asset,
+        signer: Signer,
+        timestampProvider: LocalTimestampProvider,
+        identitySigners: IdentitySigner[],
+    ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion[] }>;
+    public static async create(
+        manifest: Manifest,
+        asset: Asset,
+        signer: Signer,
+        timestampProvider: LocalTimestampProvider,
+        identitySigners: IdentitySigner | IdentitySigner[],
+    ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion | IdentityAssertion[] }> {
+        // Create a data hash assertion (hard binding)
+        const dataHashAssertion = DataHashAssertion.create('SHA-256');
+        manifest.addAssertion(dataHashAssertion);
+
+        identitySigners = Array.isArray(identitySigners) ? identitySigners : [identitySigners];
+        const identityAssertions: IdentityAssertion[] = [];
+        for (const identitySigner of identitySigners) {
+            // Create an ICA (identity claims aggregation) assertion with placeholder values
+            const identityAssertion = new IdentityAssertion();
+            // Set preliminary values with placeholder hash
+            identityAssertion.setSignerPayload(
+                [
+                    {
+                        url: `self#jumbf=c2pa.assertions/c2pa.hash.data`,
+                        hash: new Uint8Array(32).fill(0x00),
+                    },
+                ],
+                identitySigner.signatureType,
+                identitySigner.roles,
+            );
+            // Reserve enough space up-front for the real COSE_Sign1 ICA credential.
+            identityAssertion.setSignature(
+                new Uint8Array(4096).fill(0xaa),
+                new Uint8Array(256).fill(0x00),
+                undefined,
+                manifest,
+            );
+
+            manifest.addAssertion(identityAssertion);
+            identityAssertions.push(identityAssertion);
+        }
+
+        // Make space in the asset for the manifest (now includes ICA assertion)
+        await asset.ensureManifestSpace(manifest.parentStore.measureSize());
+
+        // Update the hard binding with the asset
+        await dataHashAssertion.updateWithAsset(asset);
+
+        // First signing pass populates claim assertion hashes used by hard-binding validation.
+        await manifest.sign(signer, timestampProvider);
+
+        if (!manifest.claim) {
+            throw new Error('Manifest claim is missing after signing');
+        }
+        const hardBindingRef = manifest.claim.assertions.find(
+            ref => ref.uri === `self#jumbf=c2pa.assertions/${dataHashAssertion.fullLabel}`,
+        );
+
+        if (!hardBindingRef) {
+            throw new Error('Hard binding reference is missing after signing');
+        }
+
+        for (let i = 0; i < identityAssertions.length; i++) {
+            const identityAssertion = identityAssertions[i];
+            const identitySigner = identitySigners[i];
+
+            // Update the ICA (identity claims aggregation) assertion with the correct hash
+            identityAssertion.setSignerPayload(
+                [
+                    {
+                        url: hardBindingRef.uri,
+                        hash: hardBindingRef.hash,
+                    },
+                ],
+                identitySigner.signatureType,
+                identitySigner.roles,
+            );
+
+            const ica = new IdentityClaimsAggregation(identitySigner);
+            const icaCredential = IdentityClaimsAggregation.createIcaCredential(
+                await identitySigner.issuerDid,
+                identitySigner.verifiedIdentity,
+                identityAssertion.signerPayload,
+                new Date(),
+            );
+
+            const icaSignature = await ica.createIcaSignature(icaCredential);
+            identityAssertion.setSignature(icaSignature, new Uint8Array(256).fill(0x00), undefined, manifest);
+        }
+        return {
+            dataHashAssertion,
+            identityAssertion: Array.isArray(identityAssertions) ? identityAssertions : identityAssertions[0],
+        };
     }
 }

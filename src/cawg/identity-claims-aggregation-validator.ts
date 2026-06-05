@@ -750,21 +750,15 @@ export class IdentityClaimsAggregationValidator {
         // Convert and compare
         const convertedPayload = c2paAssetBindingToSignerPayload(c2paAsset);
 
-        // Some real world signers do not following the specs by neglecting the algorthm value.
-        // To avoid breaking existing credentials, we ignore the alg value in the signer payload if it is missing, but add an informational message to the validation result to indicate that this deviation from the spec was detected.
+        // Some real world signers do not follow the spec by omitting the `alg` field.
+        // Normalize missing `alg` values for comparison without mutating `this.signerPayload`.
         if (convertedPayload.referenced_assertions && this.signerPayload.referenced_assertions) {
             for (let i = 0; i < convertedPayload.referenced_assertions.length; i++) {
                 const convertedAssertion = convertedPayload.referenced_assertions[i];
                 const signerAssertion = this.signerPayload.referenced_assertions[i];
 
-                // If converted payload lacks 'alg' but signer payload has it, remove it for comparison
-                if (
-                    signerAssertion &&
-                    (!('alg' in signerAssertion) || !signerAssertion.alg) &&
-                    convertedAssertion &&
-                    'alg' in convertedAssertion
-                ) {
-                    signerAssertion.alg = convertedAssertion.alg;
+                if (convertedAssertion && !convertedAssertion.alg && signerAssertion?.alg) {
+                    convertedAssertion.alg = signerAssertion.alg;
                 }
             }
         }

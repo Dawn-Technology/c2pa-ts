@@ -1,58 +1,75 @@
 import * as fs from 'node:fs/promises';
-import { X509Certificate } from '@peculiar/x509';
-import { CoseAlgorithmIdentifier, LocalSigner, Signer } from '../../src/cose';
+import { LocalIdentitySigner } from '../../src/cawg';
+import { NamedActorRole, SignatureType, VerifiedIdentity, VerifiedIdentityType } from '../../src/cawg/types';
+import { CoseAlgorithmIdentifier } from '../../src/cose';
 import { ValidationStatusCode } from '../../src/manifest';
-import { LocalTimestampProvider } from '../../src/rfc3161';
-import { setTrustList } from './set-trust-list';
 
-export interface TestCertificate {
+export interface TestIdentity {
     name: string;
-    certificateFile: string;
     privateKeyFile: string;
     algorithm: CoseAlgorithmIdentifier;
-    trustListFile?: string;
+    verifiedIdentity: VerifiedIdentity | VerifiedIdentity[];
+    issuerDid?: string;
+    roles: NamedActorRole[];
+    sigType: SignatureType;
 }
 
-export const TEST_CERTIFICATES: TestCertificate[] = [
+export const TEST_IDENTITIES: TestIdentity[] = [
     {
-        name: 'ES256 sample certificate',
-        certificateFile: 'tests/fixtures/sample_es256.pem',
-        privateKeyFile: 'tests/fixtures/sample_es256.key',
+        name: 'ES256 sample identity',
+        privateKeyFile: 'tests/fixtures/identity/sample_es256.pem',
         algorithm: CoseAlgorithmIdentifier.ES256,
+        verifiedIdentity: {
+            type: VerifiedIdentityType.SocialMedia,
+            name: 'Sample Creator',
+            username: 'sample-creator',
+            uri: 'https://example.com/sample-creator',
+            provider: {
+                id: 'https://example.com',
+                name: 'Example Identity Provider',
+            },
+            verifiedAt: new Date().toISOString(),
+        },
+        sigType: SignatureType.IdentityClaimsAggregation,
+        roles: [NamedActorRole.Creator],
     },
     {
-        name: 'Ed25519 sample certificate',
-        certificateFile: 'tests/fixtures/sample_ed25519.pem',
-        privateKeyFile: 'tests/fixtures/sample_ed25519.key',
+        name: 'Ed25519 sample identity',
+        privateKeyFile: 'tests/fixtures/identity/sample_ed25519.pem',
         algorithm: CoseAlgorithmIdentifier.Ed25519,
+        verifiedIdentity: {
+            type: VerifiedIdentityType.SocialMedia,
+            name: 'Sample Creator',
+            username: 'sample-creator',
+            uri: 'https://example.com/sample-creator',
+            provider: {
+                id: 'https://example.com',
+                name: 'Example Identity Provider',
+            },
+            verifiedAt: new Date().toISOString(),
+        },
+        sigType: SignatureType.IdentityClaimsAggregation,
+        roles: [NamedActorRole.Editor],
     },
 ];
 
-export interface LoadedCertificate {
-    signer: Signer;
-    timestampProvider: LocalTimestampProvider;
-}
-
-export async function loadTestCertificate(certificateInfo: TestCertificate): Promise<LoadedCertificate> {
-    // Load the certificate
-    const x509Certificate = new X509Certificate(await fs.readFile(certificateInfo.certificateFile));
-
+export async function loadIdentitySigner(testIdentityInfo: TestIdentity): Promise<LocalIdentitySigner> {
     // Load and parse the private key
-    const privateKeyData = await fs.readFile(certificateInfo.privateKeyFile);
+    const privateKeyData = (await fs.readFile(testIdentityInfo.privateKeyFile)).toString();
+    const beginMatch = /-----BEGIN [^-]+-----/.exec(privateKeyData);
+    const endMatch = /-----END [^-]+-----/.exec(privateKeyData);
+
+    if (!beginMatch || !endMatch) {
+        throw new Error('Invalid PEM format: missing BEGIN or END marker');
+    }
+
     const base64 = privateKeyData
-        .toString()
-        .replace(/-{5}(BEGIN|END) .*-{5}/gm, '') // Remove PEM headers
-        .replace(/\s/gm, ''); // Remove whitespace
-    const privateKey = new Uint8Array(Buffer.from(base64, 'base64'));
+        .replace(/-----BEGIN [^-]+-----/, '')
+        .replace(/-----END [^-]+-----/, '')
+        .replace(/\s/g, '');
 
-    // Create timestamp provider
-    const timestampProvider = new LocalTimestampProvider(x509Certificate, privateKey);
-
-    const signer = new LocalSigner(privateKey, certificateInfo.algorithm, x509Certificate);
-
-    // Set trust list
-    await setTrustList(certificateInfo.trustListFile);
-    return { signer, timestampProvider };
+    const privateKey = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    return new LocalIdentitySigner(privateKey, testIdentityInfo.algorithm, testIdentityInfo);
 }
 
 // Helper function to generate expected validation status entries for signing tests

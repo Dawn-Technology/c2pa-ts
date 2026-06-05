@@ -6,6 +6,7 @@ import type {
     ParsedDID,
     Resolvable,
 } from 'did-resolver';
+import { base64ToBytes } from './utils';
 
 const DID_JWK_METHOD = 'jwk';
 const DID_JWK_CONTENT_TYPE = 'application/did+ld+json';
@@ -15,27 +16,7 @@ function decodeBase64Url(input: string): Uint8Array {
     const padding = normalized.length % 4;
     const padded = padding === 0 ? normalized : `${normalized}${'='.repeat(4 - padding)}`;
 
-    interface GlobalWithBuffer {
-        Buffer?: {
-            from: (value: string, encoding: 'base64') => Uint8Array;
-        };
-    }
-
-    const bufferCtor = (globalThis as GlobalWithBuffer).Buffer;
-    if (bufferCtor?.from) {
-        return new Uint8Array(bufferCtor.from(padded, 'base64'));
-    }
-
-    if (typeof globalThis.atob === 'function') {
-        const binary = globalThis.atob(padded);
-        const bytes = new Uint8Array(binary.length);
-        for (let index = 0; index < binary.length; index++) {
-            bytes[index] = binary.charCodeAt(index);
-        }
-        return bytes;
-    }
-
-    throw new Error('No base64 decoder available in this runtime');
+    return base64ToBytes(padded);
 }
 
 function invalidDidResult(error: string): DIDResolutionResult {

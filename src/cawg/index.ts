@@ -25,6 +25,10 @@ export { didResolver } from './did-resolver';
 // Identity Claims Aggregation support
 export * from './identity-claims-aggregation';
 
+// Identity signer
+export * from './identity-signer';
+export * from './local-identity-signer';
+
 /**
  * CAWG specification version implemented by this module
  */

@@ -242,7 +242,7 @@ export class IdentityAssertionValidator {
             );
         });
 
-        if (!correctRef) {
+        if (hardBindingRefs.length > 0 && !correctRef) {
             this.result.addError(
                 ValidationStatusCode.IdentityHardBindingIncorrect,
                 this.sourceBox,

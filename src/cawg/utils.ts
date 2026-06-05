@@ -28,13 +28,18 @@ export function validatePadding(pad: Uint8Array): boolean {
  * Convert CBOR byte strings to base64 for JSON representation
  */
 export function bytesToBase64(bytes: Uint8Array): string {
-    // Use standard base64 encoding (not URL-safe)
-    let binary = '';
-    const len = bytes.byteLength;
-    for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
+    const bufferCtor = (globalThis as { Buffer?: typeof Buffer }).Buffer;
+    if (bufferCtor?.from) {
+        return bufferCtor.from(bytes).toString('base64');
     }
-    return btoa(binary);
+    if (typeof globalThis.btoa === 'function') {
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+        }
+        return globalThis.btoa(binary);
+    }
+    throw new Error('No base64 encoder available in this runtime');
 }
 
 /**
@@ -51,12 +56,7 @@ export function base64ToBytes(base64: string | Uint8Array | number[]): Uint8Arra
         base64String = base64;
     }
 
-    interface GlobalWithBuffer {
-        Buffer?: {
-            from: (input: string, encoding: 'base64') => Uint8Array;
-        };
-    }
-    const bufferCtor = (globalThis as GlobalWithBuffer).Buffer;
+    const bufferCtor = (globalThis as { Buffer?: typeof Buffer }).Buffer;
     if (bufferCtor?.from) {
         return new Uint8Array(bufferCtor.from(base64String, 'base64'));
     }

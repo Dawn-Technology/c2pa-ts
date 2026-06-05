@@ -2,13 +2,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { afterAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
-import {
-    IdentityClaimsAggregation,
-    NamedActorRole,
-    SignatureType,
-    VerifiedIdentity,
-    VerifiedIdentityType,
-} from '../src/cawg';
+import { NamedActorRole, SignatureType, VerifiedIdentity, VerifiedIdentityType } from '../src/cawg';
 import { Crypto } from '../src/crypto';
 import { CBORBox, SuperBox } from '../src/jumbf';
 import {
@@ -20,7 +14,8 @@ import {
     ManifestStore,
     ValidationStatusCode,
 } from '../src/manifest';
-import { loadIdentitySigner, loadTestCertificate, TEST_CERTIFICATES, TEST_IDENTITIES } from './utils/testCertificates';
+import { loadIdentitySigner, TEST_IDENTITIES } from './utils/test-identity-certificates';
+import { loadTestCertificate, TEST_CERTIFICATES } from './utils/testCertificates';
 
 // Location of the image to sign with identity assertion
 const sourceFile = 'tests/fixtures/dawn-technology-icon.jpg';
@@ -30,7 +25,6 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
     for (const certificate of TEST_CERTIFICATES) {
         describe(`using ${certificate.name}`, function () {
             let manifest: Manifest | undefined;
-            let issuerDid: string | undefined;
 
             it('add a manifest with ICA (identity claims aggregation) to a JPEG test file', async function () {
                 const { signer, timestampProvider } = await loadTestCertificate(certificate);
@@ -54,91 +48,8 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
                     signer,
                 });
 
-                // Create a data hash assertion (hard binding)
-                const dataHashAssertion = DataHashAssertion.create('SHA-256');
-                manifest.addAssertion(dataHashAssertion);
-
-                // Create an ICA (identity claims aggregation) assertion with placeholder values
-                const identityAssertion = new IdentityAssertion();
-                // Set preliminary values with placeholder hash
-                identityAssertion.setSignerPayload(
-                    [
-                        {
-                            url: `self#jumbf=c2pa.assertions/c2pa.hash.data`,
-                            hash: new Uint8Array(32).fill(0x00),
-                        },
-                    ],
-                    SignatureType.IdentityClaimsAggregation,
-                    [NamedActorRole.Creator],
-                );
-                // Reserve enough space up-front for the real COSE_Sign1 ICA credential.
-                identityAssertion.setSignature(
-                    new Uint8Array(4096).fill(0xaa),
-                    new Uint8Array(256).fill(0x00),
-                    undefined,
-                    manifest,
-                );
-
-                // Add the ICA (identity claims aggregation) assertion to the manifest
-                manifest.addAssertion(identityAssertion);
-
-                // Make space in the asset for the manifest (now includes ICA assertion)
-                await asset.ensureManifestSpace(manifestStore.measureSize());
-
-                // Update the hard binding with the asset
-                await dataHashAssertion.updateWithAsset(asset);
-
-                // Data hash assertion should have a hash after updateWithAsset
-                assert(dataHashAssertion.hash, 'Data hash assertion should have a hash after updateWithAsset');
-
-                // First signing pass populates claim assertion hashes used by hard-binding validation.
-                await manifest.sign(signer, timestampProvider);
-
-                assert(manifest.claim, 'Manifest claim missing after signing');
-
-                const hardBindingRef = manifest.claim.assertions.find(
-                    ref => ref.uri === `self#jumbf=c2pa.assertions/${dataHashAssertion.fullLabel}`,
-                );
-                assert(hardBindingRef, 'Hard binding reference not found in claim assertions');
-
-                // Update the ICA (identity claims aggregation) assertion with the correct hash
-                identityAssertion.setSignerPayload(
-                    [
-                        {
-                            url: hardBindingRef.uri,
-                            hash: hardBindingRef.hash,
-                        },
-                    ],
-                    SignatureType.IdentityClaimsAggregation,
-                    [NamedActorRole.Creator],
-                );
-
-                const localSigner = await loadIdentitySigner(TEST_IDENTITIES[0]);
-                const ica = new IdentityClaimsAggregation(localSigner);
-                issuerDid = 'did:jwk:' + (await localSigner.getJwk());
-                const icaCredential = IdentityClaimsAggregation.createIcaCredential(
-                    issuerDid,
-                    {
-                        verifiedIdentities: [
-                            {
-                                type: VerifiedIdentityType.SocialMedia,
-                                name: 'Sample Creator',
-                                username: 'sample-creator',
-                                uri: 'https://example.com/sample-creator',
-                                provider: {
-                                    id: 'https://example.com',
-                                    name: 'Example Identity Provider',
-                                },
-                                verifiedAt: new Date().toISOString(),
-                            },
-                        ],
-                    },
-                    identityAssertion.signerPayload,
-                    new Date(),
-                );
-
-                const icaSignature = await ica.createIcaSignature(icaCredential);
-                identityAssertion.setSignature(icaSignature, new Uint8Array(256).fill(0x00), undefined, manifest);
+                const identitySigner = await loadIdentitySigner(TEST_IDENTITIES[0]);
+                await IdentityAssertion.create(manifest, asset, signer, timestampProvider, identitySigner);
 
                 // Create the manifest signature
                 await manifest.sign(signer, timestampProvider);
