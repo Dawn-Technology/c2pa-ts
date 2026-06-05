@@ -1,23 +1,24 @@
-import { bytesToBase64Url, privateJwkToPublicJwk } from '../cawg';
+import { bytesToBase64Url, privateJwkToPublicJwk } from '../cawg/utils';
 import { Crypto, ECDSASigningAlgorithm, Ed25519SigningAlgorithm, RSASigningAlgorithm } from '../crypto';
+import { CoseAlgorithmIdentifier } from './Algorithms';
 import { Signer } from './Signer';
 
 export class LocalIdentitySigner implements Omit<Signer, 'certificate' | 'chainCertificates'> {
     get signingAlgorithm(): ECDSASigningAlgorithm | RSASigningAlgorithm | Ed25519SigningAlgorithm {
         switch (this.algorithm) {
-            case -7:
+            case CoseAlgorithmIdentifier.ES256:
                 return { name: 'ECDSA', hash: 'SHA-256', namedCurve: 'P-256' };
-            case -35:
+            case CoseAlgorithmIdentifier.ES384:
                 return { name: 'ECDSA', hash: 'SHA-384', namedCurve: 'P-384' };
-            case -36:
+            case CoseAlgorithmIdentifier.ES512:
                 return { name: 'ECDSA', hash: 'SHA-512', namedCurve: 'P-521' };
-            case -37:
+            case CoseAlgorithmIdentifier.PS256:
                 return { name: 'RSA-PSS', hash: 'SHA-256', saltLength: 32 };
-            case -38:
+            case CoseAlgorithmIdentifier.PS384:
                 return { name: 'RSA-PSS', hash: 'SHA-384', saltLength: 48 };
-            case -39:
+            case CoseAlgorithmIdentifier.PS512:
                 return { name: 'RSA-PSS', hash: 'SHA-512', saltLength: 64 };
-            case -8:
+            case CoseAlgorithmIdentifier.Ed25519:
             default:
                 return { name: 'Ed25519' };
         }
@@ -30,7 +31,7 @@ export class LocalIdentitySigner implements Omit<Signer, 'certificate' | 'chainC
      */
     public constructor(
         private readonly privateKey: Uint8Array,
-        public algorithm: COSEAlgorithmIdentifier,
+        public algorithm: CoseAlgorithmIdentifier,
     ) {}
 
     public sign(payload: Uint8Array): Promise<Uint8Array> {

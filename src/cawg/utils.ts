@@ -40,7 +40,7 @@ export function bytesToBase64(bytes: Uint8Array): string {
 /**
  * Convert base64 string to byte array
  */
-export function base64ToBytes(base64: string | Uint8Array): Uint8Array {
+export function base64ToBytes(base64: string | Uint8Array | number[]): Uint8Array {
     // If input is already a number array, convert directly to Uint8Array
     let base64String: string;
     if (Array.isArray(base64)) {
@@ -77,10 +77,7 @@ export function base64ToBytes(base64: string | Uint8Array): Uint8Array {
  * Convert byte array to base64url string
  */
 export function bytesToBase64Url(bytes: Uint8Array): string {
-    const base64url = bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-
-    const padding = (4 - (base64url.length % 4)) % 4;
-    return base64url + '='.repeat(padding);
+    return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
 /**

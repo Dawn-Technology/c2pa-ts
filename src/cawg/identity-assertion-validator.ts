@@ -261,7 +261,7 @@ export class IdentityAssertionValidator {
 
         try {
             // Clone claim and replace hashes with zeros as specified
-            const modifiedClaim = JSON.parse(JSON.stringify(this.sourceBox)) as Claim;
+            const modifiedClaim = structuredClone(this.manifest.claim)!;
 
             // Replace current identity assertion hash with zeros
             this.replaceAssertionHash(modifiedClaim, this.assertionLabel);

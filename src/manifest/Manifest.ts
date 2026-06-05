@@ -1,5 +1,5 @@
 import { Asset } from '../asset';
-import { CawgValidationOptions } from '../cawg';
+import { type CawgValidationOptions } from '../cawg';
 import { Signer } from '../cose';
 import { HashAlgorithm } from '../crypto';
 import { Crypto } from '../crypto/Crypto';

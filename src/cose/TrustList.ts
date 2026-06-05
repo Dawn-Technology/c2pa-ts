@@ -1,5 +1,5 @@
 import { X509Certificate } from '@peculiar/x509';
-import { base64ToBytes } from '../cawg';
+import { base64ToBytes } from '../cawg/utils';
 
 export class TrustList {
     /**
