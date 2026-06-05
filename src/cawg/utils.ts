@@ -6,7 +6,7 @@
  */
 import * as cborX from 'cbor-x';
 import { Crypto, HashAlgorithm } from '../crypto';
-import { Claim } from '../manifest/index.js';
+import { Claim } from '../manifest/Claim';
 import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from './types.js';
 
 /**
