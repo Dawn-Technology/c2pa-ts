@@ -3,13 +3,20 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'bun:test';
 import type { DIDDocument } from 'did-resolver';
 import { JsonWebKey as DidResolverJsonWebKey } from 'did-resolver';
-import { didResolver, IdentityClaimsAggregation, NamedActorRole, SignatureType, SUPPORTED_DID_METHODS, VerifiedIdentityType, type SignerPayloadMap } from '../../src/cawg';
+import {
+    didResolver,
+    IdentityClaimsAggregation,
+    NamedActorRole,
+    SignatureType,
+    SUPPORTED_DID_METHODS,
+    VerifiedIdentityType,
+    type SignerPayloadMap,
+} from '../../src/cawg';
 import { IdentityClaimsAggregationValidator } from '../../src/cawg/identity-claims-aggregation-validator';
 import { CoseAlgorithmIdentifier } from '../../src/cose';
 import { SigStructure } from '../../src/cose/SigStructure';
 import { CBORBox } from '../../src/jumbf';
 import { AssertionLabels, ValidationResult, ValidationStatusCode } from '../../src/manifest';
-
 
 type SupportedDidMethod = (typeof SUPPORTED_DID_METHODS)[number];
 
@@ -401,7 +408,5 @@ describe('DID validation', () => {
                 restoreDidResolver();
             }
         });
-
-        
     }
 });

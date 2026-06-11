@@ -5,7 +5,6 @@ import { CBORBox, DescriptionBox, SuperBox } from '../../../src/jumbf';
 import { Assertion, AssertionLabels, Claim, IdentityAssertion } from '../../../src/manifest';
 import * as raw from '../../../src/manifest/rawTypes';
 
-
 describe('IdentityAssertion Tests', function () {
     const claim = new Claim();
 
