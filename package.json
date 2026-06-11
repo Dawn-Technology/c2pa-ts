@@ -1,5 +1,5 @@
 {
-    "name": "@dawn/c2pa-ts",
+    "name": "@dockbite/c2pa-ts",
     "version": "0.14.0",
     "type": "module",
     "author": "TrustNXT GmbH <mail@trustnxt.com>",

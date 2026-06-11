@@ -684,6 +684,7 @@ export class Signature {
     private static async verifySignature(cert: X509Certificate, issuer: X509Certificate): Promise<boolean> {
         return cert.verify({
             publicKey: issuer.publicKey,
+            signatureOnly: true,
         });
     }
 
