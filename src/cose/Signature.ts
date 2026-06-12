@@ -43,6 +43,9 @@ export interface ValidationOptions {
      * If not provided, defaults to TrustList.trustAnchors for backwards compatibility.
      */
     trustAnchors?: (string | Uint8Array | X509Certificate)[];
+
+    /** Dedicated trust anchors for timestamp authority chains */
+    timestampTrustAnchors?: (string | Uint8Array | X509Certificate)[];
 }
 
 export class Signature {
@@ -256,6 +259,7 @@ export class Signature {
         v1Payload: Uint8Array,
         v2Payload: Uint8Array,
         sourceBox?: JUMBF.IBox,
+        validationOptions?: CawgValidationOptions,
     ): Promise<ValidationResult> {
         this.validatedTimestamp = undefined;
 
@@ -267,6 +271,8 @@ export class Signature {
             result.addError(ValidationStatusCode.TimeStampMalformed, sourceBox, 'Multiple timestamps are not allowed');
             return result;
         }
+
+        const timestampTrustAnchors = this.getTimestampTrustAnchors(validationOptions);
 
         for (const timestamp of this.timestampTokens) {
             if (
@@ -324,15 +330,22 @@ export class Signature {
                     continue;
                 }
 
-                // Validate TSA certificates
-                for (const cert of signedData.certificates ?? []) {
-                    if (!(cert instanceof pkijs.Certificate)) continue;
-                    const x509Cert = new X509Certificate(cert.toSchema().toBER());
-                    const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
-                    if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
-                        result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
-                        continue;
-                    }
+                // // Validate TSA certificates
+                // for (const cert of signedData.certificates ?? []) {
+                //     if (!(cert instanceof pkijs.Certificate)) continue;
+                //     const x509Cert = new X509Certificate(cert.toSchema().toBER());
+                //     const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
+                //     if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
+                //         result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
+                //         continue;
+                //     }
+                // }
+
+                if (
+                    !(await Signature.validateTimestampSignerTrust(signedData, tstInfo.genTime, timestampTrustAnchors))
+                ) {
+                    result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
+                    continue;
                 }
 
                 this.validatedTimestamp = tstInfo.genTime;
@@ -347,22 +360,39 @@ export class Signature {
         return result;
     }
 
-    public static async verifySignedDataSignature(signedData: pkijs.SignedData): Promise<boolean> {
-        if (!signedData.signerInfos.length) return false;
-        const signerInfo = signedData.signerInfos[0];
+    private getTimestampTrustAnchors(validationOptions?: CawgValidationOptions): X509Certificate[] {
+        let timestampTrustAnchorsInput = validationOptions?.trustAnchors;
+        const cawgConfiguration = (validationOptions as { cawg?: unknown } | undefined)?.cawg;
 
-        // Find the certificate referenced by sid
-        let certificate = signedData.certificates?.[0];
-        if (signerInfo.sid instanceof pkijs.IssuerAndSerialNumber) {
-            const sid = signerInfo.sid;
-            certificate = signedData.certificates?.find(
-                cert =>
-                    cert instanceof pkijs.Certificate &&
-                    cert.issuer.isEqual(sid.issuer) &&
-                    cert.serialNumber.isEqual(sid.serialNumber),
-            );
+        if (cawgConfiguration && typeof cawgConfiguration === 'object') {
+            const trustedConfig = cawgConfiguration as {
+                trustAnchors?: unknown;
+                timestampTrustAnchors?: unknown;
+            };
+
+            if (Array.isArray(trustedConfig.timestampTrustAnchors)) {
+                timestampTrustAnchorsInput = trustedConfig.timestampTrustAnchors as (
+                    | string
+                    | Uint8Array
+                    | X509Certificate
+                )[];
+            } else if (Array.isArray(trustedConfig.trustAnchors)) {
+                timestampTrustAnchorsInput = trustedConfig.trustAnchors as (string | Uint8Array | X509Certificate)[];
+            }
         }
+
+        if (!timestampTrustAnchorsInput) {
+            return TrustList.trustAnchors;
+        }
+
+        return TrustList.parseTrustAnchors(timestampTrustAnchorsInput);
+    }
+
+    public static async verifySignedDataSignature(signedData: pkijs.SignedData): Promise<boolean> {
+        const certificate = Signature.getSignedDataSignerCertificate(signedData);
         if (!(certificate instanceof pkijs.Certificate)) return false;
+
+        const signerInfo = signedData.signerInfos[0];
 
         const signerHashAlgorithm = Crypto.getHashAlgorithmByOID(signerInfo.digestAlgorithm.algorithmId);
         if (!signerHashAlgorithm) return false;
@@ -412,6 +442,61 @@ export class Signature {
             new Uint8Array(certificate.subjectPublicKeyInfo.toSchema().toBER()),
             signingAlgorithm,
         );
+    }
+
+    private static getSignedDataSignerCertificate(signedData: pkijs.SignedData): pkijs.Certificate | undefined {
+        if (!signedData.signerInfos.length) return undefined;
+
+        const signerInfo = signedData.signerInfos[0];
+        const certificates = (signedData.certificates ?? []).filter(
+            (cert): cert is pkijs.Certificate => cert instanceof pkijs.Certificate,
+        );
+        let certificate: pkijs.Certificate | undefined = certificates[0];
+
+        if (signerInfo.sid instanceof pkijs.IssuerAndSerialNumber) {
+            const sid = signerInfo.sid;
+            certificate = certificates.find(
+                cert => cert.issuer.isEqual(sid.issuer) && cert.serialNumber.isEqual(sid.serialNumber),
+            );
+        }
+
+        return certificate instanceof pkijs.Certificate ? certificate : undefined;
+    }
+
+    private static async validateTimestampSignerTrust(
+        signedData: pkijs.SignedData,
+        timestamp: Date,
+        timestampTrustAnchors: X509Certificate[],
+    ): Promise<boolean> {
+        const signerCertificate = Signature.getSignedDataSignerCertificate(signedData);
+        if (!signerCertificate) {
+            return false;
+        }
+
+        const signerX509Certificate = new X509Certificate(signerCertificate.toSchema().toBER());
+        const signerCertificateValidation = await Signature.validateCertificate(
+            signerX509Certificate,
+            timestamp,
+            false,
+        );
+        if (signerCertificateValidation !== ValidationStatusCode.SigningCredentialTrusted) {
+            return false;
+        }
+
+        const intermediateCertificates = (signedData.certificates ?? [])
+            .filter(
+                (cert): cert is pkijs.Certificate => cert instanceof pkijs.Certificate && cert !== signerCertificate,
+            )
+            .map(cert => new X509Certificate(cert.toSchema().toBER()));
+
+        const chainValidation = await Signature.validateChain(
+            signerX509Certificate,
+            timestamp,
+            intermediateCertificates,
+            timestampTrustAnchors,
+        );
+
+        return chainValidation === ValidationStatusCode.SigningCredentialTrusted;
     }
 
     private getTimestampWithoutVerification(): Date | undefined {
@@ -495,7 +580,9 @@ export class Signature {
 
         const result = new ValidationResult();
 
-        result.merge(await this.validateTimestamp(payload, CBORBox.encoder.encode(this.signature), sourceBox));
+        result.merge(
+            await this.validateTimestamp(payload, CBORBox.encoder.encode(this.signature), sourceBox, validationOptions),
+        );
         const timestamp = this.validatedTimestamp ?? new Date();
 
         // Parse trust anchors from options or fall back to global TrustList for backwards compatibility

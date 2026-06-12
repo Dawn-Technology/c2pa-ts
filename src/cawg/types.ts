@@ -269,10 +269,8 @@ export interface CawgTrustConfiguration {
     // acceptedCertificatePolicies: Map<string, string[]>;
     /** List of X.509 certificate trust anchors */
     trustAnchors?: (string | Uint8Array | X509Certificate)[];
-    /** TODO List of trusted identity claims aggregator DIDs */
-    // trustedIcaIssuers?: string[];
-    /** TODO List of trusted identity claims aggregator trust anchors */
-    // trustedIcaAnchors?: string[];
+    /** List of trusted identity claims aggregator DIDs */
+    trustedIcaIssuers?: string[];
     /** Whether to check credential revocation status */
     checkRevocation?: boolean;
     /** Current time for validation (defaults to now) */

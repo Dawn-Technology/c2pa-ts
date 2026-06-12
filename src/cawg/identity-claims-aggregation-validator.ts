@@ -363,13 +363,28 @@ export class IdentityClaimsAggregationValidator {
         return { kty: 'OKP', crv: 'Ed25519', x };
     }
 
-    // The validator SHALL verify that the issuer’s DID is present or can be traced to its preconfigured list of
-    // trustable entities. If the issuer is not verifiably trusted, the validator MUST issue the failure code
-    // cawg.ica.untrusted_issuer but MAY continue validation.
-    // TODO
     async verifyIssuerTrust(issuerDid: string): Promise<boolean> {
-        // TODO
-        return true;
+        const trustedIcaIssuers = (this.validationOptions?.trustedIcaIssuers ?? [])
+            .map(did => did.trim())
+            .filter(Boolean);
+
+        // Keep backwards-compatible permissive mode when no explicit trust policy is configured.
+        if (!trustedIcaIssuers.length) {
+            return true;
+        }
+
+        const normalizeDid = (did: string): string => { 
+            const match = /^did:([^:]+):(.*)$/i.exec(did.trim());
+            if (!match) {
+                return did.trim();
+            }
+
+            const [, method, methodSpecificId] = match;
+            return `did:${method.toLowerCase()}:${methodSpecificId}`;
+        };
+
+        const trustedSet = new Set(trustedIcaIssuers.map(normalizeDid));
+        return trustedSet.has(normalizeDid(issuerDid));
     }
 
     async verifyCoseSign1(coseSign1: DecodedCoseSign1, publicKey: DIDPublicKey): Promise<boolean> {
