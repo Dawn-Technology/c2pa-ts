@@ -1,2 +1,7 @@
 [test]
 preload = ["./tests/setup.ts"]
+
+[install.scopes]
+"@dawn-technology" = {
+  url = "https://npm.pkg.github.com",
+}
