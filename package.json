@@ -1,6 +1,6 @@
 {
-    "name": "@dockbite/c2pa-ts",
-    "version": "0.14.0",
+    "name": "@dawn-technology/c2pa-ts",
+    "version": "0.15.0",
     "type": "module",
     "author": "TrustNXT GmbH <mail@trustnxt.com>",
     "license": "Apache-2.0",
