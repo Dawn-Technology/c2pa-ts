@@ -42,7 +42,7 @@ import {
     X509CertificateCreateSelfSignedParams,
     X509CertificateGenerator,
 } from '@peculiar/x509';
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
 import { CoseAlgorithmIdentifier, LocalSigner, TrustList } from '../src/cose';
 import { SuperBox } from '../src/jumbf';
@@ -405,6 +405,8 @@ describe('Certificate Chain Validation', () => {
         timestampProvider = new LocalTimestampProvider(leafCert, await toPkcs8Bytes(leafKeys.privateKey), [
             intermediateCert,
         ]);
+        TrustList.setTimestampTrustAnchors([rootCert, leafCert]);
+
         // Create a COSE signer backed by the leaf certificate (ES256 / P-256)
         signer = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
             intermediateCert,
@@ -647,6 +649,7 @@ describe('Certificate Chain Validation', () => {
                 [otherIntermediateCert],
             );
 
+            TrustList.setTimestampTrustAnchors([...TrustList.timestampTrustAnchors, otherLeafCert]);
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
             // check individual codes
@@ -685,8 +688,9 @@ describe('Certificate Chain Validation', () => {
         });
 
         it('should detect not-yet-valid leaf certificate', async () => {
+            const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
-                notBefore: new Date(Date.now() + 1000), // not valid yet
+                notBefore: tomorrow, // not valid yet
             });
 
             // Create timestamp provider

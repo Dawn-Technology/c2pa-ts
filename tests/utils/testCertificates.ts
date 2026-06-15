@@ -1,9 +1,9 @@
 import * as fs from 'node:fs/promises';
 import { X509Certificate } from '@peculiar/x509';
-import { CoseAlgorithmIdentifier, LocalSigner, Signer } from '../../src/cose';
+import { CoseAlgorithmIdentifier, LocalSigner, Signer, TrustList } from '../../src/cose';
 import { ValidationStatusCode } from '../../src/manifest';
 import { LocalTimestampProvider } from '../../src/rfc3161';
-import { setTrustList } from './set-trust-list';
+import { setTimestampTrustList, setTrustList } from './set-trust-list';
 
 export interface TestCertificate {
     name: string;
@@ -52,6 +52,7 @@ export async function loadTestCertificate(certificateInfo: TestCertificate): Pro
 
     // Set trust list
     await setTrustList(certificateInfo.trustListFile);
+    await TrustList.setTimestampTrustAnchors([x509Certificate]);
     return { signer, timestampProvider };
 }
 
