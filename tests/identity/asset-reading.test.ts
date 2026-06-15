@@ -6,7 +6,7 @@ import { CawgValidationOptions } from '../../src/cawg';
 import { SuperBox } from '../../src/jumbf';
 import { ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
 import { BinaryHelper } from '../../src/util';
-import { setTrustList } from '../utils/set-trust-list';
+import { setTimestampTrustList, setTrustList } from '../utils/set-trust-list';
 
 const baseDir = 'tests/fixtures/identity/image';
 
@@ -238,6 +238,7 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
 
 beforeAll(async () => {
     await setTrustList();
+    await setTimestampTrustList();
 });
 
 describe('Functional Identity Asset Reading Tests', function () {

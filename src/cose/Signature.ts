@@ -12,7 +12,7 @@ import {
 } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
-import { type CawgValidationOptions } from '../cawg';
+import { bytesToBase64, type CawgValidationOptions } from '../cawg';
 import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
@@ -272,7 +272,10 @@ export class Signature {
             return result;
         }
 
-        const timestampTrustAnchors = this.getTimestampTrustAnchors(validationOptions);
+        const timestampTrustAnchors =
+            validationOptions?.timestampTrustAnchors ?
+                TrustList.parseTrustAnchors(validationOptions.timestampTrustAnchors)
+            :   TrustList.timestampTrustAnchors;
 
         for (const timestamp of this.timestampTokens) {
             if (
@@ -330,22 +333,21 @@ export class Signature {
                     continue;
                 }
 
-                // // Validate TSA certificates
-                // for (const cert of signedData.certificates ?? []) {
-                //     if (!(cert instanceof pkijs.Certificate)) continue;
-                //     const x509Cert = new X509Certificate(cert.toSchema().toBER());
-                //     const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
-                //     if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
-                //         result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
-                //         continue;
-                //     }
-                // }
+                // Validate TSA certificates
+                for (const cert of signedData.certificates ?? []) {
+                    if (!(cert instanceof pkijs.Certificate)) continue;
+                    const x509Cert = new X509Certificate(cert.toSchema().toBER());
+                    const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
+                    if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
+                        result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
+                        continue;
+                    }
+                }
 
                 if (
                     !(await Signature.validateTimestampSignerTrust(signedData, tstInfo.genTime, timestampTrustAnchors))
                 ) {
                     result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
-                    continue;
                 }
 
                 this.validatedTimestamp = tstInfo.genTime;
@@ -358,34 +360,6 @@ export class Signature {
         }
 
         return result;
-    }
-
-    private getTimestampTrustAnchors(validationOptions?: CawgValidationOptions): X509Certificate[] {
-        let timestampTrustAnchorsInput = validationOptions?.trustAnchors;
-        const cawgConfiguration = (validationOptions as { cawg?: unknown } | undefined)?.cawg;
-
-        if (cawgConfiguration && typeof cawgConfiguration === 'object') {
-            const trustedConfig = cawgConfiguration as {
-                trustAnchors?: unknown;
-                timestampTrustAnchors?: unknown;
-            };
-
-            if (Array.isArray(trustedConfig.timestampTrustAnchors)) {
-                timestampTrustAnchorsInput = trustedConfig.timestampTrustAnchors as (
-                    | string
-                    | Uint8Array
-                    | X509Certificate
-                )[];
-            } else if (Array.isArray(trustedConfig.trustAnchors)) {
-                timestampTrustAnchorsInput = trustedConfig.trustAnchors as (string | Uint8Array | X509Certificate)[];
-            }
-        }
-
-        if (!timestampTrustAnchorsInput) {
-            return TrustList.trustAnchors;
-        }
-
-        return TrustList.parseTrustAnchors(timestampTrustAnchorsInput);
     }
 
     public static async verifySignedDataSignature(signedData: pkijs.SignedData): Promise<boolean> {
@@ -654,6 +628,7 @@ export class Signature {
         }
 
         // Check timestamp
+        // console.log('validityTimestamp', validityTimestamp, 'notBefore', certificate.notBefore, 'notAfter', certificate.notAfter);
         if (certificate.notBefore >= validityTimestamp || certificate.notAfter <= validityTimestamp)
             return ValidationStatusCode.SigningCredentialExpired;
 
@@ -829,16 +804,19 @@ export class Signature {
             });
 
             if (!issuer) {
+                // await this.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
 
             // Signature check and validate certificate and timestamp for the issuer
             if (!(await Signature.validateChainCertificate(current, issuer, timestamp))) {
+                // await this.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
 
             // Loop detection
             if (seen.has(issuer)) {
+                // await this.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
             seen.add(issuer);
@@ -875,5 +853,23 @@ export class Signature {
         }
 
         return true;
+    }
+
+    private static async printPublicKey(certificate: X509Certificate) {
+        try {
+            // const boe = certificate.publicKey as unknown as CryptoKey;
+            // const spki = await crypto.subtle.exportKey('spki', boe);
+            const spki = certificate.rawData;
+            // 2. Converteer naar base64
+            // const base64Cert = Buffer.from(spki).toString('base64');
+            const base64Cert = bytesToBase64(new Uint8Array(spki));
+            // 3. Voeg line breaks elke 64 tekens (PEM standaard)
+            const pem = base64Cert.match(/.{1,64}/g)?.join('\n');
+            // 4. Voeg de PEM headers toe
+            const pemString = `-----BEGIN PUBLIC KEY-----\n${pem}\n-----END PUBLIC KEY-----`;
+            console.debug(pemString);
+        } catch (e) {
+            console.debug('Failed to print public key for debugging:', e);
+        }
     }
 }
