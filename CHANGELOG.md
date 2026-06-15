@@ -1,5 +1,11 @@
 # c2pa-ts
 
+## 0.15.1
+
+### Patch Changes
+
+- Fix timestamp trustlist
+
 ## 0.15.0
 
 ### Minor Changes
