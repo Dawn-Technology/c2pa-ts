@@ -3,11 +3,16 @@ import { Asset } from '../../asset';
 import {
     CawgTrustConfiguration,
     CawgValidator,
+    ExpectedCountersignerMap,
+    HashedUriMap,
+    HashMap,
     IdentityClaimsAggregation,
     IdentitySigner,
     isEmptyOrMissing,
     NamedActorRole,
+    RawIdentityAssertion,
     SignatureType,
+    SignerPayloadMap,
 } from '../../cawg';
 import { Signer } from '../../cose';
 import * as JUMBF from '../../jumbf';
@@ -22,54 +27,6 @@ import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
 import { AssertionLabels } from './AssertionLabels';
 import { DataHashAssertion } from './DataHashAssertion';
-
-/**
- * Hash algorithm and value map used in CAWG identity assertions
- */
-interface HashMap {
-    alg: string;
-    hash: Uint8Array;
-}
-
-/**
- * Hashed URI map structure referencing C2PA assertions
- */
-interface HashedUriMap {
-    url: string;
-    alg?: string;
-    hash: Uint8Array;
-}
-
-/**
- * Expected countersigner information
- */
-interface ExpectedCountersignerMap {
-    partial_signer_payload: SignerPayloadMap;
-    expected_credentials?: HashMap;
-}
-
-/**
- * Signer payload map - the core data structure signed by the credential holder
- */
-interface SignerPayloadMap {
-    referenced_assertions: HashedUriMap[];
-    sig_type: SignatureType;
-    role?: NamedActorRole[];
-    expected_partial_claim?: HashMap;
-    expected_claim_generator?: HashMap;
-    expected_countersigners?: ExpectedCountersignerMap[];
-}
-
-/**
- * Raw identity assertion structure as stored in CBOR
- */
-interface RawIdentityAssertion {
-    signer_payload: SignerPayloadMap;
-    signature: Uint8Array;
-    // signature_info?: any;
-    pad1: Uint8Array;
-    pad2?: Uint8Array;
-}
 
 /**
  * CAWG Identity Assertion
@@ -243,6 +200,18 @@ export class IdentityAssertion extends Assertion {
         }
     }
 
+    /**
+     * Create a manifest hard-binding assertion plus one CAWG identity assertion.
+     *
+     * Use this overload when a single identity signer should be attached.
+     *
+     * @param manifest - Manifest being populated and signed
+     * @param asset - Asset the manifest is bound to
+     * @param signer - Primary C2PA signer used for manifest signing
+     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
+     * @param identitySigners - Single identity signer used to produce ICA credential
+     * @returns Created hard-binding assertion and identity assertion
+     */
     public static async create(
         manifest: Manifest,
         asset: Asset,
@@ -250,6 +219,19 @@ export class IdentityAssertion extends Assertion {
         timestampProvider: LocalTimestampProvider,
         identitySigners: IdentitySigner,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion }>;
+
+    /**
+     * Create a manifest hard-binding assertion plus multiple CAWG identity assertions.
+     *
+     * Use this overload when multiple identity signers should be attached.
+     *
+     * @param manifest - Manifest being populated and signed
+     * @param asset - Asset the manifest is bound to
+     * @param signer - Primary C2PA signer used for manifest signing
+     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
+     * @param identitySigners - Identity signers used to produce ICA credentials
+     * @returns Created hard-binding assertion and identity assertions
+     */
     public static async create(
         manifest: Manifest,
         asset: Asset,
@@ -257,6 +239,24 @@ export class IdentityAssertion extends Assertion {
         timestampProvider: LocalTimestampProvider,
         identitySigners: IdentitySigner[],
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion[] }>;
+
+    /**
+     * Create CAWG identity assertions and bind them to the active hard-binding assertion.
+     *
+     * Flow:
+     * 1. Add hard-binding assertion placeholder.
+     * 2. Add identity assertion placeholder(s) with reserved space.
+     * 3. Sign manifest once to materialize claim assertion hashes.
+     * 4. Replace placeholder hard-binding hash with actual hash.
+     * 5. Build and sign ICA credential(s) and resize assertion padding.
+     *
+     * @param manifest - Manifest being populated and signed
+     * @param asset - Asset the manifest is bound to
+     * @param signer - Primary C2PA signer used for manifest signing
+     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
+     * @param identitySigners - One or more identity signers
+     * @returns Created hard-binding assertion and identity assertion(s)
+     */
     public static async create(
         manifest: Manifest,
         asset: Asset,
@@ -268,6 +268,7 @@ export class IdentityAssertion extends Assertion {
         const dataHashAssertion = DataHashAssertion.create('SHA-256');
         manifest.addAssertion(dataHashAssertion);
 
+        // Normalize input so downstream logic can iterate uniformly.
         identitySigners = Array.isArray(identitySigners) ? identitySigners : [identitySigners];
         const identityAssertions: IdentityAssertion[] = [];
         for (const identitySigner of identitySigners) {
@@ -316,6 +317,7 @@ export class IdentityAssertion extends Assertion {
             throw new Error('Hard binding reference is missing after signing');
         }
 
+        // Replace placeholder content with real hard-binding references and ICA signatures.
         for (let i = 0; i < identityAssertions.length; i++) {
             const identityAssertion = identityAssertions[i];
             const identitySigner = identitySigners[i];
@@ -333,6 +335,7 @@ export class IdentityAssertion extends Assertion {
             );
 
             const ica = new IdentityClaimsAggregation(identitySigner);
+            // Build a verifiable credential bound to the finalized signer_payload.
             const icaCredential = IdentityClaimsAggregation.createIcaCredential(
                 await identitySigner.issuerDid,
                 identitySigner.verifiedIdentity,
@@ -340,9 +343,12 @@ export class IdentityAssertion extends Assertion {
                 new Date(),
             );
 
+            // Produce COSE_Sign1 bytes and update padding to maintain reserved size.
             const icaSignature = await ica.createIcaSignature(icaCredential);
             identityAssertion.setSignature(icaSignature, new Uint8Array(256).fill(0x00), undefined, manifest);
         }
+
+        // Return single or multiple identity assertions according to overload usage.
         return {
             dataHashAssertion,
             identityAssertion: Array.isArray(identityAssertions) ? identityAssertions : identityAssertions[0],

@@ -30,13 +30,28 @@ import {
 } from './utils.js';
 
 export class IdentityAssertionValidator {
+    /** The C2PA manifest that contains the assertion being validated */
     manifest: Manifest;
+    /** The identity assertion under validation */
     assertion: IdentityAssertion;
+    /** Label of the assertion inside the manifest */
     assertionLabel: string;
+    /** Source JUMBF box used for validation status location */
     sourceBox: JUMBF.SuperBox;
+    /** Validation options, including optional CAWG trust configuration */
     options: CawgValidationOptions;
+    /** Aggregated validation result for this assertion */
     result: ValidationResult;
 
+    /**
+     * Create a validator for a CAWG identity assertion.
+     *
+     * @param manifest - Manifest containing the assertion
+     * @param assertion - Identity assertion to validate
+     * @param assertionLabel - Assertion label in the claim graph
+     * @param sourceBox - JUMBF box that backs this assertion
+     * @param options - Validation options
+     */
     constructor(
         manifest: Manifest,
         assertion: IdentityAssertion,

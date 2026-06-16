@@ -11,6 +11,9 @@ import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from '
 
 /**
  * Serialize claim data using CBOR deterministic encoding
+ *
+ * @param payload - The claim data to serialize
+ * @returns CBOR-encoded claim bytes
  */
 export function serializeClaimData(payload: Claim): Uint8Array {
     // Use deterministic encoding for consistent results
@@ -19,13 +22,22 @@ export function serializeClaimData(payload: Claim): Uint8Array {
 
 /**
  * Validate that padding contains only zero (0x00) bytes
+ *
+ * @param pad - The padding bytes to validate
+ * @returns True if all bytes are 0x00, false otherwise
  */
 export function validatePadding(pad: Uint8Array): boolean {
     return pad.every(byte => byte === 0x00);
 }
 
 /**
- * Convert CBOR byte strings to base64 for JSON representation
+ * Convert byte array to base64 string
+ *
+ * Uses Node.js Buffer if available, otherwise falls back to btoa().
+ *
+ * @param bytes - The bytes to encode
+ * @returns Base64-encoded string
+ * @throws Error if no base64 encoder is available in this runtime
  */
 export function bytesToBase64(bytes: Uint8Array): string {
     const bufferCtor = (globalThis as { Buffer?: typeof Buffer }).Buffer;
@@ -44,6 +56,13 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 /**
  * Convert base64 string to byte array
+ *
+ * Handles Node.js Buffer or browser atob APIs depending on runtime environment.
+ * Accepts strings, Uint8Array, or number arrays.
+ *
+ * @param base64 - Base64-encoded string, bytes, or number array
+ * @returns Decoded byte array
+ * @throws Error if no base64 decoder is available in this runtime
  */
 export function base64ToBytes(base64: string | Uint8Array | number[]): Uint8Array {
     // If input is already a number array, convert directly to Uint8Array
@@ -75,6 +94,11 @@ export function base64ToBytes(base64: string | Uint8Array | number[]): Uint8Arra
 
 /**
  * Convert byte array to base64url string
+ *
+ * Uses RFC 4648 base64url encoding (URL-safe variant without padding).
+ *
+ * @param bytes - The bytes to encode
+ * @returns Base64url-encoded string (without padding)
  */
 export function bytesToBase64Url(bytes: Uint8Array): string {
     return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -82,7 +106,12 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
 
 /**
  * Convert signer_payload to C2PA asset binding format for verifiable credentials
- * Converts CBOR byte strings to base64
+ *
+ * Transforms the CBOR binary signer_payload into JSON-friendly format by
+ * converting byte hashes to base64 strings for use in ICA credentials.
+ *
+ * @param payload - The signer payload to convert
+ * @returns C2PA asset binding in JSON-compatible format
  */
 export function signerPayloadToC2paAssetBinding(payload: SignerPayloadMap): C2paAssetBinding {
     return {
@@ -121,7 +150,12 @@ export function signerPayloadToC2paAssetBinding(payload: SignerPayloadMap): C2pa
 
 /**
  * Convert C2PA asset binding to signer_payload format
- * Converts base64 strings to CBOR byte arrays
+ *
+ * Transforms JSON-format C2PA asset binding (from ICA credentials) back to
+ * the CBOR-compatible signer_payload format by decoding base64 hashes to bytes.
+ *
+ * @param binding - The C2PA asset binding to convert
+ * @returns Signer payload in CBOR-compatible format
  */
 export function c2paAssetBindingToSignerPayload(binding: C2paAssetBinding): SignerPayloadMap {
     return {
@@ -160,6 +194,12 @@ export function c2paAssetBindingToSignerPayload(binding: C2paAssetBinding): Sign
 
 /**
  * Check if two hash maps are equal
+ *
+ * Compares hash maps by algorithm and hash value.
+ *
+ * @param a - First hash map
+ * @param b - Second hash map
+ * @returns True if both maps are equal
  */
 export function hashMapsEqual(a: HashMap, b: HashMap): boolean {
     if (a.alg !== b.alg) return false;
@@ -169,6 +209,12 @@ export function hashMapsEqual(a: HashMap, b: HashMap): boolean {
 
 /**
  * Check if two hashed URI maps are equal
+ *
+ * Compares hashed URI maps by URL, algorithm, and hash value.
+ *
+ * @param a - First hashed URI map
+ * @param b - Second hashed URI map
+ * @returns True if both maps are equal
  */
 export function hashedUriMapsEqual(a: HashedUriMap, b: HashedUriMap): boolean {
     if (a.url !== b.url) return false;
@@ -179,6 +225,11 @@ export function hashedUriMapsEqual(a: HashedUriMap, b: HashedUriMap): boolean {
 
 /**
  * Find duplicates in an array of hashed URI maps
+ *
+ * Identifies hashed URI references that appear multiple times in the array.
+ *
+ * @param references - Array of hashed URI maps to check
+ * @returns Array of duplicate references (excluding first occurrence)
  */
 export function findDuplicateReferences(references: HashedUriMap[]): HashedUriMap[] {
     const seen = new Set<string>();
@@ -198,6 +249,12 @@ export function findDuplicateReferences(references: HashedUriMap[]): HashedUriMa
 
 /**
  * Check if an assertion is a hard binding assertion
+ *
+ * Hard binding assertions are C2PA hash assertions that cryptographically
+ * bind the claim to the asset content.
+ *
+ * @param assertionLabel - The assertion label to check
+ * @returns True if the assertion is a hard binding assertion
  */
 export function isHardBindingAssertion(assertionLabel: string): boolean {
     return (
@@ -209,7 +266,15 @@ export function isHardBindingAssertion(assertionLabel: string): boolean {
 
 /**
  * Extract assertion label from JUMBF URI
- * Example: "self#jumbf=c2pa/uuid/c2pa.assertions/c2pa.hash.data" -> "c2pa.hash.data"
+ *
+ * Parses a JUMBF URI to extract just the assertion label component.
+ *
+ * @param jumbfUri - JUMBF URI (e.g., "self#jumbf=c2pa/uuid/c2pa.assertions/c2pa.hash.data")
+ * @returns Assertion label (e.g., "c2pa.hash.data") or null if unable to parse
+ *
+ * @example
+ * extractAssertionLabel("self#jumbf=c2pa/uuid/c2pa.assertions/c2pa.hash.data")
+ * // Returns: "c2pa.hash.data"
  */
 export function extractAssertionLabel(jumbfUri: string): string | null {
     const match = /c2pa\.assertions\/([^/]+)$/.exec(jumbfUri);
@@ -217,7 +282,12 @@ export function extractAssertionLabel(jumbfUri: string): string | null {
 }
 
 /**
- * Helper: Compute cryptographic hash
+ * Compute cryptographic hash of data
+ *
+ * @param data - The data to hash
+ * @param algorithm - Hash algorithm name (sha256, sha384, or sha512)
+ * @returns Promise resolving to the hash bytes
+ * @throws Error if the algorithm is not supported
  */
 export async function computeHash(data: Uint8Array, algorithm: string): Promise<Uint8Array> {
     const algorithmMap: Record<string, HashAlgorithm> = {
@@ -236,7 +306,11 @@ export async function computeHash(data: Uint8Array, algorithm: string): Promise<
 }
 
 /**
- * Helper: Compare two byte arrays
+ * Compare two byte arrays for equality
+ *
+ * @param a - First byte array
+ * @param b - Second byte array
+ * @returns True if both arrays are equal
  */
 export function arrayEquals(a: Uint8Array, b: Uint8Array): boolean {
     if (a.length !== b.length) return false;
@@ -244,21 +318,35 @@ export function arrayEquals(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 /**
- * Helper: Deep equality check
+ * Deep equality check using JSON serialization
+ *
+ * Note: This approach may not work correctly with all object types.
+ *
+ * @param a - First value to compare
+ * @param b - Second value to compare
+ * @returns True if both values are deeply equal
  */
 export function deepEqual(a: unknown, b: unknown): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /**
- * Helper: Check if Uint8Array does not exist or is empty
+ * Check if a Uint8Array is missing or empty
+ *
+ * @param data - The data to check
+ * @returns True if data is null, undefined, or has length 0
  */
 export function isEmptyOrMissing(data: Uint8Array | null | undefined): boolean {
     return !data || data.length === 0;
 }
 
 /**
- * Convert a private JWK to a public JWK by removing private key parameters
+ * Convert a private JWK to a public JWK
+ *
+ * Removes private key parameters from a JSON Web Key, leaving only the public key information.
+ *
+ * @param privateJwk - Private JWK containing private parameters
+ * @returns Public JWK with only public parameters
  */
 export function privateJwkToPublicJwk({ kty, crv, x, y, n, e }: JsonWebKey): JsonWebKey {
     return { ...{ kty, crv, x, y, n, e } };

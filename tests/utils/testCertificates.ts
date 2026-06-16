@@ -3,7 +3,7 @@ import { X509Certificate } from '@peculiar/x509';
 import { CoseAlgorithmIdentifier, LocalSigner, Signer, TrustList } from '../../src/cose';
 import { ValidationStatusCode } from '../../src/manifest';
 import { LocalTimestampProvider } from '../../src/rfc3161';
-import { setTimestampTrustList, setTrustList } from './set-trust-list';
+import { setTrustList } from './set-trust-list';
 
 export interface TestCertificate {
     name: string;

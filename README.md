@@ -2,8 +2,6 @@
 
 # c2pa-ts
 
-[![Tests](https://github.com/TrustNXT/c2pa-ts/actions/workflows/ci.yaml/badge.svg)](https://github.com/TrustNXT/c2pa-ts/actions/workflows/ci.yaml)
-
 ## About
 
 `c2pa-ts` is a pure TypeScript implementation of [Coalition for Content Provenance and Authenticity (C2PA)](https://c2pa.org/) according to [specification version 2.1](https://c2pa.org/specifications/specifications/2.1/specs/C2PA_Specification.html).

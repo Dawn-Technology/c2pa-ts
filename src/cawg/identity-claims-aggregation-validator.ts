@@ -40,12 +40,25 @@ import {
 import { c2paAssetBindingToSignerPayload } from './utils.js';
 
 export class IdentityClaimsAggregationValidator {
+    /** COSE signature bytes from the identity assertion */
     signature: Uint8Array;
+    /** signer_payload that must match the credential's c2paAsset binding */
     signerPayload: SignerPayloadMap;
+    /** Assertion label used for validation status references */
     assertionLabel: string;
+    /** Optional trust and validation-time configuration */
     validationOptions?: CawgTrustConfiguration;
+    /** Aggregated validation result */
     result: ValidationResult;
 
+    /**
+     * Create a validator for an ICA credential embedded in a CAWG assertion.
+     *
+     * @param signature - COSE_Sign1 bytes containing the verifiable credential
+     * @param signerPayload - signer_payload from the parent identity assertion
+     * @param assertionLabel - Label used to report validation locations
+     * @param validationOptions - Optional trust configuration
+     */
     constructor(
         signature: Uint8Array,
         signerPayload: SignerPayloadMap,
@@ -243,13 +256,23 @@ export class IdentityClaimsAggregationValidator {
         return this.result;
     }
 
-    // Helper functions
+    /**
+     * Validate that the COSE algorithm is supported for ICA.
+     *
+     * @param alg - COSE algorithm identifier
+     * @returns True if algorithm is supported
+     */
     validateCoseAlgorithm(alg: number | undefined): boolean {
         if (alg === undefined) return false;
         return (Object.values(SUPPORTED_COSE_ALGORITHMS) as number[]).includes(alg);
     }
 
-    private validateIcaCredentialStructure(credential: IdentityClaimsAggregationCredential): void {
+    /**
+     * Validate required credential envelope fields.
+     *
+     * @param credential - Parsed verifiable credential
+     */
+    validateIcaCredentialStructure(credential: IdentityClaimsAggregationCredential): void {
         // Validate @context
         if (!credential['@context'] || !Array.isArray(credential['@context'])) {
             this.result.addError(
@@ -280,6 +303,339 @@ export class IdentityClaimsAggregationValidator {
         }
     }
 
+    /**
+     * Verify issuer DID against trusted ICA issuer list.
+     *
+     * @param issuerDid - Issuer DID from credential
+     * @returns True when issuer is trusted or trust list is not configured
+     */
+    async verifyIssuerTrust(issuerDid: string): Promise<boolean> {
+        const trustedIcaIssuers = (this.validationOptions?.trustedIcaIssuers ?? [])
+            .map(did => did.trim())
+            .filter(Boolean);
+
+        // Keep backwards-compatible permissive mode when no explicit trust policy is configured.
+        if (!trustedIcaIssuers.length) {
+            return true;
+        }
+
+        const normalizeDid = (did: string): string => {
+            const match = /^did:([^:]+):(.*)$/i.exec(did.trim());
+            if (!match) {
+                return did.trim();
+            }
+
+            const [, method, methodSpecificId] = match;
+            return `did:${method.toLowerCase()}:${methodSpecificId}`;
+        };
+
+        const trustedSet = new Set(trustedIcaIssuers.map(normalizeDid));
+        return trustedSet.has(normalizeDid(issuerDid));
+    }
+
+    /**
+     * Verify COSE_Sign1 signature using key material from DID document.
+     *
+     * @param coseSign1 - Parsed COSE_Sign1 structure
+     * @param publicKey - Public key from DID document
+     * @returns True if signature verification succeeds
+     */
+    async verifyCoseSign1(coseSign1: DecodedCoseSign1, publicKey: DIDPublicKey): Promise<boolean> {
+        try {
+            // Validate required fields
+            if (!coseSign1.protectedHeaderBytes || !coseSign1.protectedHeader?.alg || !coseSign1.signature) {
+                return false;
+            }
+
+            // Validate payload
+            if (!coseSign1.payload) {
+                return false;
+            }
+
+            // Get the COSE algorithm
+            const coseAlgorithm = Algorithms.getAlgorithm(coseSign1.protectedHeader.alg);
+            if (!coseAlgorithm) {
+                return false;
+            }
+
+            // Convert DIDPublicKey to DER format and extract algorithm info if available
+            const keyConversionResult = await this.convertDidPublicKeyToDer(publicKey);
+            if (!keyConversionResult) {
+                return false;
+            }
+            const { derPublicKey, keyAlgorithmInfo } = keyConversionResult;
+
+            // Determine the full signing algorithm with namedCurve if needed
+            const signingAlgorithm = this.buildSigningAlgorithm(coseAlgorithm.alg, keyAlgorithmInfo);
+            if (!signingAlgorithm) {
+                return false;
+            }
+
+            // Create the Sig_structure and encode it per RFC 8152
+            // Sig_structure = [
+            //   context = "Signature1",
+            //   body_protected = protected header bytes,
+            //   external_aad = empty,
+            //   payload = the credential bytes
+            // ]
+            const sigStructure = new SigStructure('Signature1', coseSign1.protectedHeaderBytes, coseSign1.payload);
+            const toBeSigned = sigStructure.encode();
+
+            // Verify the signature using the existing Crypto infrastructure
+            const isValid = await Crypto.verifySignature(
+                toBeSigned,
+                coseSign1.signature,
+                derPublicKey,
+                signingAlgorithm,
+            );
+
+            return isValid;
+        } catch {
+            // Signature verification failed due to exception
+            return false;
+        }
+    }
+
+    /**
+     * Validate RFC 3161 timestamp token bound to the assertion signature.
+     *
+     * @param timestamp - Timestamp token bytes
+     * @param rawProtectedBucket - Protected header bytes
+     * @param signature - Signature bytes from COSE_Sign1
+     * @returns True if timestamp is valid and cryptographically bound
+     */
+    async validateTimestamp(
+        timestamp: Uint8Array | ArrayBuffer,
+        rawProtectedBucket: Uint8Array,
+        signature: Uint8Array,
+    ): Promise<boolean> {
+        // Validate RFC 3161 timestamp in CAWG sigTst2.
+        // Some producers embed a full TimeStampResp while others embed a bare TimeStampToken (CMS ContentInfo).
+        try {
+            let timestampBytes: Uint8Array | null = null;
+
+            if (timestamp instanceof Uint8Array) {
+                timestampBytes = timestamp;
+            } else if (timestamp instanceof ArrayBuffer) {
+                timestampBytes = new Uint8Array(timestamp);
+            }
+
+            if (!timestampBytes || timestampBytes.length === 0) {
+                return false;
+            }
+
+            let signedData: pkijs.SignedData | null = null;
+
+            // Preferred format: full RFC 3161 TimeStampResp.
+            try {
+                const response = pkijs.TimeStampResp.fromBER(timestampBytes as Uint8Array<ArrayBuffer>);
+                if (
+                    response.status.status !== pkijs.PKIStatus.granted &&
+                    response.status.status !== pkijs.PKIStatus.grantedWithMods
+                ) {
+                    return false;
+                }
+
+                if (response.timeStampToken?.content) {
+                    signedData = new pkijs.SignedData({ schema: response.timeStampToken.content });
+                }
+            } catch {
+                // Fallback: bare TimeStampToken (ContentInfo wrapping SignedData).
+                const ber = new Uint8Array(timestampBytes).buffer;
+                const parsed = asn1js.fromBER(ber);
+                if (parsed.offset === -1) {
+                    return false;
+                }
+
+                const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
+                if (!contentInfo.content) {
+                    return false;
+                }
+
+                signedData = new pkijs.SignedData({ schema: contentInfo.content });
+            }
+
+            if (!signedData) {
+                return false;
+            }
+
+            const rawTstInfo = signedData.encapContentInfo.eContent?.getValue();
+            if (!rawTstInfo) {
+                return false;
+            }
+
+            const tstInfo = pkijs.TSTInfo.fromBER(rawTstInfo);
+
+            // Require a supported message-imprint algorithm and non-empty digest.
+            const hashAlgorithm = Crypto.getHashAlgorithmByOID(tstInfo.messageImprint.hashAlgorithm.algorithmId);
+            if (!hashAlgorithm) {
+                return false;
+            }
+
+            const hashedMessage = new Uint8Array(tstInfo.messageImprint.hashedMessage.getValue());
+            if (hashedMessage.length === 0) {
+                return false;
+            }
+
+            // sigTst2 (CAWG/C2PA v2) timestamps the CBOR-wrapped signature bytes, not the raw signature bytes.
+            const signaturePayload = JUMBF.CBORBox.encoder.encode(signature);
+            const toBeSigned = new SigStructure('CounterSignature', rawProtectedBucket, signaturePayload).encode();
+            const actualHash = await Crypto.digest(toBeSigned, hashAlgorithm);
+            if (!BinaryHelper.bufEqual(actualHash, hashedMessage)) {
+                return false;
+            }
+
+            if (!(await Signature.verifySignedDataSignature(signedData))) {
+                return false;
+            }
+
+            // Validate TSA certificates
+            for (const cert of signedData.certificates ?? []) {
+                if (!(cert instanceof pkijs.Certificate)) continue;
+                const x509Cert = new X509Certificate(cert.toSchema().toBER());
+                const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
+                if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
+                    return false;
+                }
+            }
+
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Validate credential temporal validity fields.
+     *
+     * @param credential - Parsed verifiable credential
+     */
+    validateCredentialValidityDates(credential: IdentityClaimsAggregationCredential): void {
+        const now = this.validationOptions?.validationTime ?? new Date();
+
+        // Check validFrom / issuanceDate
+        const validFrom = credential.validFrom ?? credential.issuanceDate;
+        if (!validFrom) {
+            this.result.addError(
+                ValidationStatusCode.IcaValidFromMissing,
+                this.assertionLabel,
+                'Missing validFrom or issuanceDate',
+            );
+            return;
+        }
+
+        const validFromDate = new Date(validFrom);
+        if (validFromDate > now) {
+            this.result.addError(
+                ValidationStatusCode.IcaValidFromInvalid,
+                this.assertionLabel,
+                'Credential not yet valid',
+            );
+        }
+
+        // Check validUntil / expirationDate
+        const validUntil = credential.validUntil ?? credential.expirationDate;
+        if (validUntil) {
+            const validUntilDate = new Date(validUntil);
+            if (validUntilDate < now) {
+                this.result.addError(
+                    ValidationStatusCode.IcaValidUntilInvalid,
+                    this.assertionLabel,
+                    'Credential has expired',
+                );
+            }
+        }
+    }
+
+    /**
+     * Validate credential revocation status (placeholder implementation).
+     *
+     * @param credential - Parsed verifiable credential
+     */
+    async validateRevocationStatus(credential: IdentityClaimsAggregationCredential): Promise<void> {
+        // TODO Check credential status for revocation
+        // Implementation would check bitstring status list or other mechanism
+
+        if (credential.credentialStatus) {
+            // Simplified check
+            this.result.addInformational(
+                ValidationStatusCode.IcaCredentialNotRevoked,
+                this.assertionLabel,
+                'Credential not revoked',
+            );
+        }
+    }
+
+    /**
+     * Validate that credential c2paAsset binding matches assertion signer_payload.
+     *
+     * @param c2paAsset - Credential asset binding object
+     */
+    validateC2paAssetBinding(c2paAsset: C2paAssetBinding): void {
+        // Convert and compare
+        const convertedPayload = c2paAssetBindingToSignerPayload(c2paAsset);
+
+        // Some real world signers do not following the specs by neglecting the algorthm value.
+        // To avoid breaking existing credentials, we ignore the alg value in the signer payload if it is missing, but add an informational message to the validation result to indicate that this deviation from the spec was detected.
+        if (convertedPayload.referenced_assertions && this.signerPayload.referenced_assertions) {
+            for (let i = 0; i < convertedPayload.referenced_assertions.length; i++) {
+                const convertedAssertion = convertedPayload.referenced_assertions[i];
+                const signerAssertion = this.signerPayload.referenced_assertions[i];
+
+                // If converted payload lacks 'alg' but signer payload has it, remove it for comparison
+                if (
+                    signerAssertion &&
+                    (!('alg' in signerAssertion) || !signerAssertion.alg) &&
+                    convertedAssertion &&
+                    'alg' in convertedAssertion
+                ) {
+                    signerAssertion.alg = convertedAssertion.alg;
+                }
+            }
+        }
+
+        if (JSON.stringify(convertedPayload) !== JSON.stringify(this.signerPayload)) {
+            this.result.addError(
+                ValidationStatusCode.IcaSignerPayloadMismatch,
+                this.assertionLabel,
+                'c2paAsset does not match signer_payload',
+            );
+        }
+    }
+
+    /**
+     * Validate basic structure of verified identity entries.
+     *
+     * @param verifiedIdentities - Verified identity list from credentialSubject
+     */
+    validateVerifiedIdentities(verifiedIdentities: VerifiedIdentity[]): void {
+        if (!verifiedIdentities || verifiedIdentities.length === 0) {
+            this.result.addError(
+                ValidationStatusCode.IcaVerifiedIdentitiesMissing,
+                this.assertionLabel,
+                'verifiedIdentities array is empty or missing',
+            );
+            return;
+        }
+
+        // Validate each verified identity entry
+        for (const identity of verifiedIdentities) {
+            if (!identity.type || !identity.provider || !identity.verifiedAt) {
+                this.result.addError(
+                    ValidationStatusCode.IcaVerifiedIdentitiesInvalid,
+                    this.assertionLabel,
+                    'Verified identity missing required fields',
+                );
+            }
+        }
+    }
+
+    /**
+     * Read issuer DID and normalize did:jwk padding differences.
+     *
+     * @param credential - Parsed verifiable credential
+     * @returns Issuer DID, or null if absent
+     */
     getIssuerDid(credential: IdentityClaimsAggregationCredential): string | null {
         const did = this.extractIssuerDid(credential);
 
@@ -291,6 +647,12 @@ export class IdentityClaimsAggregationValidator {
         return did;
     }
 
+    /**
+     * Extract issuer DID value from string or object issuer forms.
+     *
+     * @param credential - Parsed verifiable credential
+     * @returns Issuer DID, or null if absent
+     */
     extractIssuerDid(credential: IdentityClaimsAggregationCredential): string | null {
         if (typeof credential.issuer === 'string') {
             return credential.issuer;
@@ -300,11 +662,23 @@ export class IdentityClaimsAggregationValidator {
         return null;
     }
 
+    /**
+     * Resolve DID to DID document.
+     *
+     * @param did - DID to resolve
+     * @returns DID document if resolution succeeds
+     */
     async resolveDid(did: string): Promise<DIDDocument | null> {
         const res = await didResolver.resolve(did);
         return res.didDocument;
     }
 
+    /**
+     * Extract a supported verification key from a DID document.
+     *
+     * @param didDocument - DID document that contains verification methods
+     * @returns Public key material or null when unavailable/unsupported
+     */
     extractPublicKeyFromDidDocument(didDocument: DIDDocument): DIDPublicKey | null {
         // Extract assertionMethod verification method
         // and return public key material
@@ -361,86 +735,6 @@ export class IdentityClaimsAggregationValidator {
             .replace(/\//g, '_')
             .replace(/=/g, '');
         return { kty: 'OKP', crv: 'Ed25519', x };
-    }
-
-    async verifyIssuerTrust(issuerDid: string): Promise<boolean> {
-        const trustedIcaIssuers = (this.validationOptions?.trustedIcaIssuers ?? [])
-            .map(did => did.trim())
-            .filter(Boolean);
-
-        // Keep backwards-compatible permissive mode when no explicit trust policy is configured.
-        if (!trustedIcaIssuers.length) {
-            return true;
-        }
-
-        const normalizeDid = (did: string): string => { 
-            const match = /^did:([^:]+):(.*)$/i.exec(did.trim());
-            if (!match) {
-                return did.trim();
-            }
-
-            const [, method, methodSpecificId] = match;
-            return `did:${method.toLowerCase()}:${methodSpecificId}`;
-        };
-
-        const trustedSet = new Set(trustedIcaIssuers.map(normalizeDid));
-        return trustedSet.has(normalizeDid(issuerDid));
-    }
-
-    async verifyCoseSign1(coseSign1: DecodedCoseSign1, publicKey: DIDPublicKey): Promise<boolean> {
-        try {
-            // Validate required fields
-            if (!coseSign1.protectedHeaderBytes || !coseSign1.protectedHeader?.alg || !coseSign1.signature) {
-                return false;
-            }
-
-            // Validate payload
-            if (!coseSign1.payload) {
-                return false;
-            }
-
-            // Get the COSE algorithm
-            const coseAlgorithm = Algorithms.getAlgorithm(coseSign1.protectedHeader.alg);
-            if (!coseAlgorithm) {
-                return false;
-            }
-
-            // Convert DIDPublicKey to DER format and extract algorithm info if available
-            const keyConversionResult = await this.convertDidPublicKeyToDer(publicKey);
-            if (!keyConversionResult) {
-                return false;
-            }
-            const { derPublicKey, keyAlgorithmInfo } = keyConversionResult;
-
-            // Determine the full signing algorithm with namedCurve if needed
-            const signingAlgorithm = this.buildSigningAlgorithm(coseAlgorithm.alg, keyAlgorithmInfo);
-            if (!signingAlgorithm) {
-                return false;
-            }
-
-            // Create the Sig_structure and encode it per RFC 8152
-            // Sig_structure = [
-            //   context = "Signature1",
-            //   body_protected = protected header bytes,
-            //   external_aad = empty,
-            //   payload = the credential bytes
-            // ]
-            const sigStructure = new SigStructure('Signature1', coseSign1.protectedHeaderBytes, coseSign1.payload);
-            const toBeSigned = sigStructure.encode();
-
-            // Verify the signature using the existing Crypto infrastructure
-            const isValid = await Crypto.verifySignature(
-                toBeSigned,
-                coseSign1.signature,
-                derPublicKey,
-                signingAlgorithm,
-            );
-
-            return isValid;
-        } catch {
-            // Signature verification failed due to exception
-            return false;
-        }
     }
 
     /**
@@ -582,6 +876,12 @@ export class IdentityClaimsAggregationValidator {
         return null;
     }
 
+    /**
+     * Extract timestamp token bytes from CAWG sigTst2 unprotected header.
+     *
+     * @param coseSign1 - Parsed COSE_Sign1 structure
+     * @returns Timestamp bytes, or null if no token exists
+     */
     extractTimestamp(coseSign1: DecodedCoseSign1): Uint8Array | ArrayBuffer | null {
         const unprotectedHeader = coseSign1.unprotectedHeader;
         if (!unprotectedHeader || typeof unprotectedHeader !== 'object') {
@@ -609,212 +909,11 @@ export class IdentityClaimsAggregationValidator {
         return (val as Uint8Array | ArrayBuffer) ?? null;
     }
 
-    async validateTimestamp(
-        timestamp: Uint8Array | ArrayBuffer,
-        rawProtectedBucket: Uint8Array,
-        signature: Uint8Array,
-    ): Promise<boolean> {
-        // Validate RFC 3161 timestamp in CAWG sigTst2.
-        // Some producers embed a full TimeStampResp while others embed a bare TimeStampToken (CMS ContentInfo).
-        try {
-            let timestampBytes: Uint8Array | null = null;
-
-            if (timestamp instanceof Uint8Array) {
-                timestampBytes = timestamp;
-            } else if (timestamp instanceof ArrayBuffer) {
-                timestampBytes = new Uint8Array(timestamp);
-            }
-
-            if (!timestampBytes || timestampBytes.length === 0) {
-                return false;
-            }
-
-            let signedData: pkijs.SignedData | null = null;
-
-            // Preferred format: full RFC 3161 TimeStampResp.
-            try {
-                const response = pkijs.TimeStampResp.fromBER(timestampBytes as Uint8Array<ArrayBuffer>);
-                if (
-                    response.status.status !== pkijs.PKIStatus.granted &&
-                    response.status.status !== pkijs.PKIStatus.grantedWithMods
-                ) {
-                    return false;
-                }
-
-                if (response.timeStampToken?.content) {
-                    signedData = new pkijs.SignedData({ schema: response.timeStampToken.content });
-                }
-            } catch {
-                // Fallback: bare TimeStampToken (ContentInfo wrapping SignedData).
-                const ber = new Uint8Array(timestampBytes).buffer;
-                const parsed = asn1js.fromBER(ber);
-                if (parsed.offset === -1) {
-                    return false;
-                }
-
-                const contentInfo = new pkijs.ContentInfo({ schema: parsed.result });
-                if (!contentInfo.content) {
-                    return false;
-                }
-
-                signedData = new pkijs.SignedData({ schema: contentInfo.content });
-            }
-
-            if (!signedData) {
-                return false;
-            }
-
-            const rawTstInfo = signedData.encapContentInfo.eContent?.getValue();
-            if (!rawTstInfo) {
-                return false;
-            }
-
-            const tstInfo = pkijs.TSTInfo.fromBER(rawTstInfo);
-
-            // Require a supported message-imprint algorithm and non-empty digest.
-            const hashAlgorithm = Crypto.getHashAlgorithmByOID(tstInfo.messageImprint.hashAlgorithm.algorithmId);
-            if (!hashAlgorithm) {
-                return false;
-            }
-
-            const hashedMessage = new Uint8Array(tstInfo.messageImprint.hashedMessage.getValue());
-            if (hashedMessage.length === 0) {
-                return false;
-            }
-
-            // sigTst2 (CAWG/C2PA v2) timestamps the CBOR-wrapped signature bytes, not the raw signature bytes.
-            const signaturePayload = JUMBF.CBORBox.encoder.encode(signature);
-            const toBeSigned = new SigStructure('CounterSignature', rawProtectedBucket, signaturePayload).encode();
-            const actualHash = await Crypto.digest(toBeSigned, hashAlgorithm);
-            if (!BinaryHelper.bufEqual(actualHash, hashedMessage)) {
-                return false;
-            }
-
-            if (!(await Signature.verifySignedDataSignature(signedData))) {
-                return false;
-            }
-
-            // Validate TSA certificates
-            for (const cert of signedData.certificates ?? []) {
-                if (!(cert instanceof pkijs.Certificate)) continue;
-                const x509Cert = new X509Certificate(cert.toSchema().toBER());
-                const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
-                if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
-                    return false;
-                }
-            }
-
-            return true;
-        } catch {
-            return false;
-        }
-    }
-
-    validateCredentialValidityDates(credential: IdentityClaimsAggregationCredential): void {
-        const now = this.validationOptions?.validationTime ?? new Date();
-
-        // Check validFrom / issuanceDate
-        const validFrom = credential.validFrom ?? credential.issuanceDate;
-        if (!validFrom) {
-            this.result.addError(
-                ValidationStatusCode.IcaValidFromMissing,
-                this.assertionLabel,
-                'Missing validFrom or issuanceDate',
-            );
-            return;
-        }
-
-        const validFromDate = new Date(validFrom);
-        if (validFromDate > now) {
-            this.result.addError(
-                ValidationStatusCode.IcaValidFromInvalid,
-                this.assertionLabel,
-                'Credential not yet valid',
-            );
-        }
-
-        // Check validUntil / expirationDate
-        const validUntil = credential.validUntil ?? credential.expirationDate;
-        if (validUntil) {
-            const validUntilDate = new Date(validUntil);
-            if (validUntilDate < now) {
-                this.result.addError(
-                    ValidationStatusCode.IcaValidUntilInvalid,
-                    this.assertionLabel,
-                    'Credential has expired',
-                );
-            }
-        }
-    }
-
-    async validateRevocationStatus(credential: IdentityClaimsAggregationCredential): Promise<void> {
-        // TODO Check credential status for revocation
-        // Implementation would check bitstring status list or other mechanism
-
-        if (credential.credentialStatus) {
-            // Simplified check
-            this.result.addInformational(
-                ValidationStatusCode.IcaCredentialNotRevoked,
-                this.assertionLabel,
-                'Credential not revoked',
-            );
-        }
-    }
-
-    validateC2paAssetBinding(c2paAsset: C2paAssetBinding): void {
-        // Convert and compare
-        const convertedPayload = c2paAssetBindingToSignerPayload(c2paAsset);
-
-        // Some real world signers do not following the specs by neglecting the algorthm value.
-        // To avoid breaking existing credentials, we ignore the alg value in the signer payload if it is missing, but add an informational message to the validation result to indicate that this deviation from the spec was detected.
-        if (convertedPayload.referenced_assertions && this.signerPayload.referenced_assertions) {
-            for (let i = 0; i < convertedPayload.referenced_assertions.length; i++) {
-                const convertedAssertion = convertedPayload.referenced_assertions[i];
-                const signerAssertion = this.signerPayload.referenced_assertions[i];
-
-                // If converted payload lacks 'alg' but signer payload has it, remove it for comparison
-                if (
-                    signerAssertion &&
-                    (!('alg' in signerAssertion) || !signerAssertion.alg) &&
-                    convertedAssertion &&
-                    'alg' in convertedAssertion
-                ) {
-                    signerAssertion.alg = convertedAssertion.alg;
-                }
-            }
-        }
-
-        if (JSON.stringify(convertedPayload) !== JSON.stringify(this.signerPayload)) {
-            this.result.addError(
-                ValidationStatusCode.IcaSignerPayloadMismatch,
-                this.assertionLabel,
-                'c2paAsset does not match signer_payload',
-            );
-        }
-    }
-
-    validateVerifiedIdentities(verifiedIdentities: VerifiedIdentity[]): void {
-        if (!verifiedIdentities || verifiedIdentities.length === 0) {
-            this.result.addError(
-                ValidationStatusCode.IcaVerifiedIdentitiesMissing,
-                this.assertionLabel,
-                'verifiedIdentities array is empty or missing',
-            );
-            return;
-        }
-
-        // Validate each verified identity entry
-        for (const identity of verifiedIdentities) {
-            if (!identity.type || !identity.provider || !identity.verifiedAt) {
-                this.result.addError(
-                    ValidationStatusCode.IcaVerifiedIdentitiesInvalid,
-                    this.assertionLabel,
-                    'Verified identity missing required fields',
-                );
-            }
-        }
-    }
-
+    /**
+     * Parse raw COSE_Sign1 bytes into typed structure.
+     *
+     * @returns Parsed COSE_Sign1 structure, or null on parse failure
+     */
     async parseCoseSign1(): Promise<DecodedCoseSign1 | null> {
         try {
             // COSE_Sign1 structure (RFC 8152):
