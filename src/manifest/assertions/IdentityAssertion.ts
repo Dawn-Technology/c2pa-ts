@@ -264,9 +264,14 @@ export class IdentityAssertion extends Assertion {
         timestampProvider: LocalTimestampProvider,
         identitySigners: IdentitySigner | IdentitySigner[],
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion | IdentityAssertion[] }> {
-        // Create a data hash assertion (hard binding)
-        const dataHashAssertion = DataHashAssertion.create('SHA-256');
-        manifest.addAssertion(dataHashAssertion);
+        // Get or create a data hash assertion (hard binding)
+        let dataHashAssertion;
+        if (manifest.assertions?.getHardBindings()?.length) {
+            dataHashAssertion = manifest.assertions?.getHardBindings()[0] as DataHashAssertion;
+        } else {
+            dataHashAssertion = DataHashAssertion.create('SHA-256');
+            manifest.addAssertion(dataHashAssertion);
+        }
 
         identitySigners = Array.isArray(identitySigners) ? identitySigners : [identitySigners];
         const identityAssertions: IdentityAssertion[] = [];
