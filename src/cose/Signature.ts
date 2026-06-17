@@ -348,6 +348,7 @@ export class Signature {
                     !(await Signature.validateTimestampSignerTrust(signedData, tstInfo.genTime, timestampTrustAnchors))
                 ) {
                     result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
+                    continue;
                 }
 
                 this.validatedTimestamp = tstInfo.genTime;
