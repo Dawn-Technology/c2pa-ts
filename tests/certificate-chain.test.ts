@@ -408,7 +408,7 @@ describe('Certificate Chain Validation', () => {
         TrustList.setTimestampTrustAnchors([rootCert, leafCert]);
 
         // Create a COSE signer backed by the leaf certificate (ES256 / P-256)
-        signer = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
+        signer = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [
             intermediateCert,
         ]);
     });
@@ -436,7 +436,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(directLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 directLeafCert,
                 [rootCert],
             );
@@ -459,7 +458,6 @@ describe('Certificate Chain Validation', () => {
             );
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(rootKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 rootCert,
             );
 
@@ -482,7 +480,6 @@ describe('Certificate Chain Validation', () => {
             );
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(rootKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 rootCert,
             );
 
@@ -524,7 +521,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(leafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 leafCert,
                 [wrongIntermediateCert],
             );
@@ -564,7 +560,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(leafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 leafCert,
                 [intermediateCert, anyCert],
             );
@@ -644,7 +639,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -673,7 +667,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [intermediateCert],
             );
@@ -702,7 +695,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [intermediateCert],
             );
@@ -735,7 +727,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -768,7 +759,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -801,7 +791,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -834,7 +823,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -870,7 +858,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -904,7 +891,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -935,7 +921,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -967,7 +952,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -996,7 +980,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -1027,7 +1010,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert],
             );
@@ -1045,7 +1027,7 @@ describe('Certificate Chain Validation', () => {
     describe('8. Error Handling', () => {
         it('should handle malformed certificate data', async () => {
             try {
-                new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
+                new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [
                     intermediateCert,
                     new X509Certificate(new Uint8Array([1, 2, 3, 4])),
                 ]);
@@ -1057,7 +1039,7 @@ describe('Certificate Chain Validation', () => {
 
         it('should handle empty certificate data', async () => {
             try {
-                new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
+                new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [
                     intermediateCert,
                     new X509Certificate(new Uint8Array([])),
                 ]);
@@ -1128,7 +1110,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [otherIntermediateCert, circularIntermediateCert],
             );
@@ -1170,7 +1151,6 @@ describe('Certificate Chain Validation', () => {
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
-                CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
                 [intermediateCert],
             );

@@ -1,22 +1,31 @@
 import { type X509Certificate } from '@peculiar/x509';
 import { Crypto } from '../crypto';
-import { Algorithms } from './Algorithms';
+import { Algorithms, CoseAlgorithmIdentifier } from './Algorithms';
 import { Signer } from './Signer';
 
 export class LocalSigner implements Signer {
+    public readonly algorithm: CoseAlgorithmIdentifier;
+
     /**
-     * Creates a signer instance using a certificate and given private key.
+     * Creates a signer instance using a certificate and PKCS#8 private key.
+     * The COSE algorithm identifier is derived automatically from the private key.
      * @param privateKey - Private key in PKCS#8 format
-     * @param algorithm – COSE algorithm identifier matching the private key
      * @param certificate – The X.509 certificate to use for signing
      * @param chainCertificates – Additional certificates to include in the certificate chain
      */
     public constructor(
         private readonly privateKey: Uint8Array,
-        public algorithm: COSEAlgorithmIdentifier,
         public certificate: X509Certificate,
         public chainCertificates: X509Certificate[] = [],
-    ) {}
+    ) {
+        const signingAlgorithm = Crypto.getAlgorithmFromPkcs8(privateKey);
+        if (!signingAlgorithm) throw new Error('Unable to determine signing algorithm from PKCS#8 private key');
+
+        const coseIdentifier = Algorithms.getCoseIdentifier(signingAlgorithm);
+        if (coseIdentifier === undefined) throw new Error(`Unsupported signing algorithm: ${signingAlgorithm.name}`);
+
+        this.algorithm = coseIdentifier;
+    }
 
     public sign(payload: Uint8Array): Promise<Uint8Array> {
         return Crypto.sign(

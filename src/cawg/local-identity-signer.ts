@@ -1,6 +1,6 @@
 import { NamedActorRole, SignatureType, VerifiedIdentity } from '../cawg';
 import { bytesToBase64Url, privateJwkToPublicJwk } from '../cawg/utils';
-import { CoseAlgorithmIdentifier } from '../cose/Algorithms';
+import { Algorithms, CoseAlgorithmIdentifier } from '../cose/Algorithms';
 import { Crypto, ECDSASigningAlgorithm, Ed25519SigningAlgorithm, RSASigningAlgorithm } from '../crypto';
 import { IdentitySigner } from './identity-signer';
 
@@ -50,6 +50,22 @@ export class LocalIdentitySigner implements IdentitySigner {
 
     get signatureType(): SignatureType {
         return this.options.sigType ?? SignatureType.IdentityClaimsAggregation;
+    }
+
+    static create(privateKey: Uint8Array, options: LocalIdentitySignerOptions) {
+        const signingAlg = Crypto.getAlgorithmFromPkcs8(privateKey);
+
+        if (!signingAlg) {
+            throw new Error('algorithm not supported');
+        }
+
+        const algorithm = Algorithms.getCoseIdentifier(signingAlg);
+
+        if (!algorithm) {
+            throw new Error('algorithm not supported');
+        }
+
+        return new LocalIdentitySigner(privateKey, algorithm, options);
     }
 
     /**
