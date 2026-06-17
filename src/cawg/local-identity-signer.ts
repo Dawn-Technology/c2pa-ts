@@ -39,6 +39,8 @@ export class LocalIdentitySigner implements IdentitySigner {
      *
      * Maps COSE algorithm identifiers to Web Crypto Algorithm specifications.
      */
+    public readonly algorithm: CoseAlgorithmIdentifier;
+
     get signingAlgorithm(): ECDSASigningAlgorithm | RSASigningAlgorithm | Ed25519SigningAlgorithm {
         switch (this.algorithm) {
             case CoseAlgorithmIdentifier.ES256:
@@ -97,14 +99,19 @@ export class LocalIdentitySigner implements IdentitySigner {
      * Creates a signer instance using a private key
      *
      * @param privateKey - Private key in PKCS#8 format
-     * @param algorithm - COSE algorithm identifier
-     * @param options - Configuration options for the signer
+     * @param options – signer options
      */
     constructor(
         private readonly privateKey: Uint8Array,
-        readonly algorithm: CoseAlgorithmIdentifier,
         private readonly options: LocalIdentitySignerOptions,
-    ) {}
+    ) {
+        const coseIdentifier = Crypto.getAlgorithmFromPkcs8(privateKey);
+        if (coseIdentifier === undefined) {
+            throw new Error('Unable to determine signing algorithm from PKCS#8 private key');
+        }
+
+        this.algorithm = coseIdentifier;
+    }
 
     /**
      * Sign a payload using the local private key

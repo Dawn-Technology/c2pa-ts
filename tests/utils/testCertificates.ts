@@ -48,11 +48,11 @@ export async function loadTestCertificate(certificateInfo: TestCertificate): Pro
     // Create timestamp provider
     const timestampProvider = new LocalTimestampProvider(x509Certificate, privateKey);
 
-    const signer = new LocalSigner(privateKey, certificateInfo.algorithm, x509Certificate);
+    const signer = new LocalSigner(privateKey, x509Certificate);
 
     // Set trust list
     await setTrustList(certificateInfo.trustListFile);
-    await TrustList.setTimestampTrustAnchors([x509Certificate]);
+    TrustList.setTimestampTrustAnchors([x509Certificate]);
     return { signer, timestampProvider };
 }
 

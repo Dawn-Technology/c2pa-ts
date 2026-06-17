@@ -69,7 +69,7 @@ export async function loadIdentitySigner(testIdentityInfo: TestIdentity): Promis
         .replace(/\s/g, '');
 
     const privateKey = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-    return new LocalIdentitySigner(privateKey, testIdentityInfo.algorithm, testIdentityInfo);
+    return new LocalIdentitySigner(privateKey, testIdentityInfo);
 }
 
 // Helper function to generate expected validation status entries for signing tests
