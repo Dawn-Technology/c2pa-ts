@@ -114,4 +114,20 @@ export class Algorithms {
 
         return coseAlgorithm.alg;
     }
+
+    /**
+     * Returns the COSE algorithm identifier for a given signing algorithm.
+     * For ECDSA the namedCurve is intentionally ignored – any curve is valid for all ECDSA identifiers per the C2PA spec.
+     * Returns `undefined` when no matching COSE algorithm exists.
+     * @param algorithm – Signing algorithm to look up
+     */
+    public static getCoseIdentifier(algorithm: SigningAlgorithm): CoseAlgorithmIdentifier | undefined {
+        const match = algorithmList.find(entry => {
+            if (entry.alg.name !== algorithm.name) return false;
+            if (algorithm.name === 'Ed25519') return true;
+            return (entry.alg as { hash: string }).hash === (algorithm as { hash: string }).hash;
+        });
+
+        return match?.coseIdentifier;
+    }
 }

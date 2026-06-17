@@ -1,24 +1,23 @@
+import { fromBER, ObjectIdentifier, Sequence } from 'asn1js';
+import type { CoseAlgorithmIdentifier } from '../cose/Algorithms';
 import { CryptoProvider } from './CryptoProvider';
+import {
+    hashAlgorithmFromOID,
+    hashAlgorithmToOID,
+    namedCurveFromOID,
+    namedCurveToOID,
+    OID_ECDSAwithSHA256,
+    OID_ECDSAwithSHA384,
+    OID_ECDSAwithSHA512,
+    OID_ECPublicKey,
+    OID_Ed25519,
+    OID_RSAEncryption,
+    OID_SHA256withRSA,
+    OID_SHA384withRSA,
+    OID_SHA512withRSA,
+} from './OIDMap';
 import { ECDSANamedCurve, HashAlgorithm, SigningAlgorithm, StreamingDigest } from './types';
 import { WebCryptoProvider } from './WebCryptoProvider';
-
-const OIDs = {
-    SHA256: '2.16.840.1.101.3.4.2.1',
-    SHA384: '2.16.840.1.101.3.4.2.2',
-    SHA512: '2.16.840.1.101.3.4.2.3',
-    RSAEncryption: '1.2.840.113549.1.1.1',
-    SHA256withRSA: '1.2.840.113549.1.1.11',
-    SHA384withRSA: '1.2.840.113549.1.1.12',
-    SHA512withRSA: '1.2.840.113549.1.1.13',
-    ECPublicKey: '1.2.840.10045.2.1',
-    ECDSAwithSHA256: '1.2.840.10045.4.3.2',
-    ECDSAwithSHA384: '1.2.840.10045.4.3.3',
-    ECDSAwithSHA512: '1.2.840.10045.4.3.4',
-    SECP256r1: '1.2.840.10045.3.1.7',
-    SECP384r1: '1.3.132.0.34',
-    SECP521r1: '1.3.132.0.35',
-    Ed25519: '1.3.101.112',
-};
 
 export class Crypto {
     public static provider: CryptoProvider = new WebCryptoProvider();
@@ -93,28 +92,14 @@ export class Crypto {
      * Returns a supported hash algorithm from an OID
      */
     public static getHashAlgorithmByOID(oid: string): HashAlgorithm | undefined {
-        switch (oid) {
-            case OIDs.SHA256:
-                return 'SHA-256';
-            case OIDs.SHA384:
-                return 'SHA-384';
-            case OIDs.SHA512:
-                return 'SHA-512';
-        }
+        return hashAlgorithmFromOID(oid);
     }
 
     /**
      * Returns the OID for a hash algorithm
      */
     public static getHashAlgorithmOID(algorithm: HashAlgorithm): string {
-        switch (algorithm) {
-            case 'SHA-256':
-                return OIDs.SHA256;
-            case 'SHA-384':
-                return OIDs.SHA384;
-            case 'SHA-512':
-                return OIDs.SHA512;
-        }
+        return hashAlgorithmToOID(algorithm);
     }
 
     /**
@@ -131,31 +116,31 @@ export class Crypto {
         const namedCurve = curveOID ? this.getNamedCurveByOID(curveOID) : undefined;
 
         switch (oid) {
-            case OIDs.RSAEncryption:
+            case OID_RSAEncryption:
                 if (!hashAlgorithm) throw new Error('Hash algorithm required for RSA');
                 return {
                     name: 'RSASSA-PKCS1-v1_5',
                     hash: hashAlgorithm,
                 };
-            case OIDs.SHA256withRSA:
+            case OID_SHA256withRSA:
                 return {
                     name: 'RSA-PSS',
                     hash: 'SHA-256',
                     saltLength: 32,
                 };
-            case OIDs.SHA384withRSA:
+            case OID_SHA384withRSA:
                 return {
                     name: 'RSA-PSS',
                     hash: 'SHA-384',
                     saltLength: 48,
                 };
-            case OIDs.SHA512withRSA:
+            case OID_SHA512withRSA:
                 return {
                     name: 'RSA-PSS',
                     hash: 'SHA-512',
                     saltLength: 64,
                 };
-            case OIDs.ECPublicKey:
+            case OID_ECPublicKey:
                 if (!hashAlgorithm) throw new Error('Hash algorithm required for EC');
                 if (!namedCurve) throw new Error('Named curve required for EC');
                 return {
@@ -163,28 +148,28 @@ export class Crypto {
                     namedCurve,
                     hash: hashAlgorithm,
                 };
-            case OIDs.ECDSAwithSHA256:
+            case OID_ECDSAwithSHA256:
                 if (!namedCurve) throw new Error('Named curve required for EC');
                 return {
                     name: 'ECDSA',
                     namedCurve,
                     hash: 'SHA-256',
                 };
-            case OIDs.ECDSAwithSHA384:
+            case OID_ECDSAwithSHA384:
                 if (!namedCurve) throw new Error('Named curve required for EC');
                 return {
                     name: 'ECDSA',
                     namedCurve,
                     hash: 'SHA-384',
                 };
-            case OIDs.ECDSAwithSHA512:
+            case OID_ECDSAwithSHA512:
                 if (!namedCurve) throw new Error('Named curve required for EC');
                 return {
                     name: 'ECDSA',
                     namedCurve,
                     hash: 'SHA-512',
                 };
-            case OIDs.Ed25519:
+            case OID_Ed25519:
                 return {
                     name: 'Ed25519',
                 };
@@ -197,29 +182,29 @@ export class Crypto {
     public static getSigningAlgorithmOID(algorithm: SigningAlgorithm): string {
         switch (algorithm.name) {
             case 'RSASSA-PKCS1-v1_5':
-                return OIDs.RSAEncryption;
+                return OID_RSAEncryption;
             case 'RSA-PSS':
                 switch (algorithm.hash) {
                     case 'SHA-256':
-                        return OIDs.SHA256withRSA;
+                        return OID_SHA256withRSA;
                     case 'SHA-384':
-                        return OIDs.SHA384withRSA;
+                        return OID_SHA384withRSA;
                     case 'SHA-512':
-                        return OIDs.SHA512withRSA;
+                        return OID_SHA512withRSA;
                 }
             // eslint-disable-next-line no-fallthrough
             case 'ECDSA':
                 switch (algorithm.hash) {
                     case 'SHA-256':
-                        return OIDs.ECDSAwithSHA256;
+                        return OID_ECDSAwithSHA256;
                     case 'SHA-384':
-                        return OIDs.ECDSAwithSHA384;
+                        return OID_ECDSAwithSHA384;
                     case 'SHA-512':
-                        return OIDs.ECDSAwithSHA512;
+                        return OID_ECDSAwithSHA512;
                 }
             // eslint-disable-next-line no-fallthrough
             case 'Ed25519':
-                return OIDs.Ed25519;
+                return OID_Ed25519;
         }
     }
 
@@ -227,27 +212,65 @@ export class Crypto {
      * Returns an ECDSA named curve from an OID
      */
     public static getNamedCurveByOID(oid: string): ECDSANamedCurve | undefined {
-        switch (oid) {
-            case OIDs.SECP256r1:
-                return 'P-256';
-            case OIDs.SECP384r1:
-                return 'P-384';
-            case OIDs.SECP521r1:
-                return 'P-521';
-        }
+        return namedCurveFromOID(oid);
     }
 
     /**
      * Returns the OID for an ECDSA named curve
      */
     public static getNamedCurveOID(namedCurve: ECDSANamedCurve): string {
-        switch (namedCurve) {
-            case 'P-256':
-                return OIDs.SECP256r1;
-            case 'P-384':
-                return OIDs.SECP384r1;
-            case 'P-521':
-                return OIDs.SECP521r1;
+        return namedCurveToOID(namedCurve);
+    }
+
+    /**
+     * Derives the COSE algorithm identifier from a DER-encoded PKCS#8 private key.
+     * For EC keys the identifier is inferred by convention (P-256→ES256, P-384→ES384, P-521→ES512).
+     * For RSA keys the identifier defaults to PS256.
+     * Returns `undefined` when the key type cannot be recognised.
+     */
+    public static getAlgorithmFromPkcs8(der: Uint8Array): CoseAlgorithmIdentifier | undefined {
+        try {
+            const parsed = fromBER(der);
+            if (parsed.offset === -1) return undefined;
+
+            const root = parsed.result;
+            if (!(root instanceof Sequence)) return undefined;
+
+            const elements = root.valueBlock.value;
+            if (elements.length < 2) return undefined;
+
+            const algorithmIdentifier = elements[1];
+            if (!(algorithmIdentifier instanceof Sequence)) return undefined;
+
+            const oidNode = algorithmIdentifier.valueBlock.value[0];
+            if (!(oidNode instanceof ObjectIdentifier)) return undefined;
+
+            const oid = oidNode.valueBlock.toString();
+
+            switch (oid) {
+                case OID_Ed25519:
+                    return -8;
+
+                case OID_ECPublicKey: {
+                    const paramsNode = algorithmIdentifier.valueBlock.value[1];
+                    if (!(paramsNode instanceof ObjectIdentifier)) return undefined;
+                    const namedCurve = namedCurveFromOID(paramsNode.valueBlock.toString());
+                    if (!namedCurve) return undefined;
+                    return (
+                        namedCurve === 'P-256' ? -7
+                        : namedCurve === 'P-384' ? -35
+                        : -36
+                    );
+                }
+
+                case OID_RSAEncryption:
+                    return -37;
+
+                default:
+                    return undefined;
+            }
+        } catch {
+            return undefined;
         }
     }
 }

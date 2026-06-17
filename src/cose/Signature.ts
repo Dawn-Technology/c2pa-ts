@@ -12,7 +12,7 @@ import {
 } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
-import { bytesToBase64, type CawgValidationOptions } from '../cawg';
+import { type CawgValidationOptions } from '../cawg';
 import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
@@ -854,23 +854,5 @@ export class Signature {
         }
 
         return true;
-    }
-
-    private static async printPublicKey(certificate: X509Certificate) {
-        try {
-            // const boe = certificate.publicKey as unknown as CryptoKey;
-            // const spki = await crypto.subtle.exportKey('spki', boe);
-            const spki = certificate.rawData;
-            // 2. Converteer naar base64
-            // const base64Cert = Buffer.from(spki).toString('base64');
-            const base64Cert = bytesToBase64(new Uint8Array(spki));
-            // 3. Voeg line breaks elke 64 tekens (PEM standaard)
-            const pem = base64Cert.match(/.{1,64}/g)?.join('\n');
-            // 4. Voeg de PEM headers toe
-            const pemString = `-----BEGIN PUBLIC KEY-----\n${pem}\n-----END PUBLIC KEY-----`;
-            console.debug(pemString);
-        } catch (e) {
-            console.debug('Failed to print public key for debugging:', e);
-        }
     }
 }
