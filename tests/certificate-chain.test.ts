@@ -44,7 +44,7 @@ import {
 } from '@peculiar/x509';
 import { beforeAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
-import { CoseAlgorithmIdentifier, LocalSigner, TrustList } from '../src/cose';
+import { LocalSigner, TrustList } from '../src/cose';
 import { SuperBox } from '../src/jumbf';
 import { DataHashAssertion, ManifestStore, ValidationResult } from '../src/manifest';
 import { LocalTimestampProvider } from '../src/rfc3161';
@@ -408,9 +408,7 @@ describe('Certificate Chain Validation', () => {
         TrustList.setTimestampTrustAnchors([rootCert, leafCert]);
 
         // Create a COSE signer backed by the leaf certificate (ES256 / P-256)
-        signer = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [
-            intermediateCert,
-        ]);
+        signer = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [intermediateCert]);
     });
 
     describe('1. Basic Certificate Chain Structure', () => {
@@ -434,11 +432,9 @@ describe('Certificate Chain Validation', () => {
                 [rootCert],
             );
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(directLeafKeys.privateKey),
-                directLeafCert,
-                [rootCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(directLeafKeys.privateKey), directLeafCert, [
+                rootCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -456,10 +452,7 @@ describe('Certificate Chain Validation', () => {
                 rootCert,
                 await toPkcs8Bytes(rootKeys.privateKey),
             );
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(rootKeys.privateKey),
-                rootCert,
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(rootKeys.privateKey), rootCert);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -478,10 +471,7 @@ describe('Certificate Chain Validation', () => {
                 await toPkcs8Bytes(rootKeys.privateKey),
                 [intermediateCert],
             );
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(rootKeys.privateKey),
-                rootCert,
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(rootKeys.privateKey), rootCert);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -519,11 +509,9 @@ describe('Certificate Chain Validation', () => {
                 [wrongIntermediateCert],
             );
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(leafKeys.privateKey),
-                leafCert,
-                [wrongIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [
+                wrongIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -558,11 +546,10 @@ describe('Certificate Chain Validation', () => {
                 [intermediateCert],
             );
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(leafKeys.privateKey),
-                leafCert,
-                [intermediateCert, anyCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [
+                intermediateCert,
+                anyCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -637,11 +624,9 @@ describe('Certificate Chain Validation', () => {
                 [otherIntermediateCert],
             );
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             TrustList.setTimestampTrustAnchors([...TrustList.timestampTrustAnchors, otherLeafCert]);
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
@@ -665,11 +650,9 @@ describe('Certificate Chain Validation', () => {
                 [intermediateCert],
             );
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [intermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                intermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -693,11 +676,9 @@ describe('Certificate Chain Validation', () => {
                 [intermediateCert],
             );
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [intermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                intermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -725,11 +706,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -757,11 +736,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -789,11 +766,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -821,11 +796,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -856,11 +829,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -889,11 +860,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -919,11 +888,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -950,11 +917,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -978,11 +943,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -1008,11 +971,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -1108,11 +1069,10 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [otherIntermediateCert, circularIntermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                otherIntermediateCert,
+                circularIntermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -1149,11 +1109,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [intermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                intermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
-import { beforeAll, describe, it, jest } from 'bun:test';
+import { beforeAll, describe, it } from 'bun:test';
 import { Asset, AssetType, BMFF, JPEG, PNG } from '../src/asset';
 import { SuperBox } from '../src/jumbf';
 import { ManifestStore, ValidationResult, ValidationStatusCode } from '../src/manifest';

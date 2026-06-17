@@ -373,7 +373,7 @@ export class IdentityClaimsAggregationValidator {
             return true;
         }
 
-        const normalizeDid = (did: string): string => { 
+        const normalizeDid = (did: string): string => {
             const match = /^did:([^:]+):(.*)$/i.exec(did.trim());
             if (!match) {
                 return did.trim();

@@ -1,4 +1,3 @@
-/* eslint-disable prettier/prettier */
 import assert from 'node:assert/strict';
 import { describe, it } from 'bun:test';
 import type { DIDDocument } from 'did-resolver';

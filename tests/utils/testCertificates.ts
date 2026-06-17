@@ -52,7 +52,7 @@ export async function loadTestCertificate(certificateInfo: TestCertificate): Pro
 
     // Set trust list
     await setTrustList(certificateInfo.trustListFile);
-    await TrustList.setTimestampTrustAnchors([x509Certificate]);
+    TrustList.setTimestampTrustAnchors([x509Certificate]);
     return { signer, timestampProvider };
 }
 
