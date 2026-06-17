@@ -310,7 +310,7 @@ export class Manifest implements ManifestComponent {
         }
 
         // Validate identity assertions
-        result.merge(await this.validateIdentityAssertions(validationOptions));
+        result.merge(await this.validateIdentityAssertions(validationOptions?.cawg));
 
         // Only process asset data if everything has been validated so far
         if (!result.isValid) return result;
@@ -623,7 +623,9 @@ export class Manifest implements ManifestComponent {
      * @param validationOptions - Validation options
      * @returns ValidationResult containing any validation errors or successes
      */
-    private async validateIdentityAssertions(validationOptions?: CawgTrustConfiguration): Promise<ValidationResult> {
+    private async validateIdentityAssertions(
+        validationOptions: CawgTrustConfiguration = {},
+    ): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         // Check for identity  assertions
