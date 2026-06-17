@@ -9,8 +9,8 @@ import * as JUMBF from '../jumbf';
 import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
 import {
+    CawgTrustConfiguration,
     SignatureType,
-    type CawgValidationOptions,
     type ExpectedCountersignerMap,
     type HashedUriMap,
     type HashMap,
@@ -38,8 +38,8 @@ export class IdentityAssertionValidator {
     assertionLabel: string;
     /** Source JUMBF box used for validation status location */
     sourceBox: JUMBF.SuperBox;
-    /** Validation options, including optional CAWG trust configuration */
-    options: CawgValidationOptions;
+    /** CAWG trust configuration */
+    options: CawgTrustConfiguration;
     /** Aggregated validation result for this assertion */
     result: ValidationResult;
 
@@ -50,14 +50,14 @@ export class IdentityAssertionValidator {
      * @param assertion - Identity assertion to validate
      * @param assertionLabel - Assertion label in the claim graph
      * @param sourceBox - JUMBF box that backs this assertion
-     * @param options - Validation options
+     * @param options - CAWG trust configuration
      */
     constructor(
         manifest: Manifest,
         assertion: IdentityAssertion,
         assertionLabel: string,
         sourceBox: JUMBF.SuperBox,
-        options: CawgValidationOptions = {},
+        options: CawgTrustConfiguration = {},
     ) {
         this.manifest = manifest;
         this.assertion = assertion;

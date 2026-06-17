@@ -11,7 +11,7 @@ import * as JUMBF from '../jumbf';
 import { IdentityAssertion, Manifest, ValidationResult } from '../manifest';
 import { IdentityAssertionValidator } from './identity-assertion-validator';
 import { IdentityClaimsAggregationValidator } from './identity-claims-aggregation-validator';
-import { CawgValidationOptions } from './types';
+import { CawgTrustConfiguration } from './types';
 
 /**
  * Validates CAWG identity assertions and identity claims aggregation credentials
@@ -29,7 +29,7 @@ export class CawgValidator {
     /** The JUMBF SuperBox containing the assertion */
     sourceBox: JUMBF.SuperBox;
     /** Validation options and trust configuration */
-    options: CawgValidationOptions;
+    options: CawgTrustConfiguration;
     /** Accumulated validation result */
     result: ValidationResult;
 
@@ -47,7 +47,7 @@ export class CawgValidator {
         assertion: IdentityAssertion,
         assertionLabel: string,
         sourceBox: JUMBF.SuperBox,
-        options: CawgValidationOptions = {},
+        options: CawgTrustConfiguration = {},
     ) {
         this.manifest = manifest;
         this.assertion = assertion;

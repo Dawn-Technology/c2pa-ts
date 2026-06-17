@@ -2,13 +2,15 @@
 
 # c2pa-ts
 
+[![Tests](https://github.com/Dawn-Technology/c2pa-ts/actions/workflows/ci.yaml/badge.svg)](https://github.com/Dawn-Technology/c2pa-ts/actions/workflows/ci.yaml)
+
 ## About
 
 `c2pa-ts` is a pure TypeScript implementation of [Coalition for Content Provenance and Authenticity (C2PA)](https://c2pa.org/) according to [specification version 2.1](https://c2pa.org/specifications/specifications/2.1/specs/C2PA_Specification.html).
 
 It does not use any native binaries or WebAssembly and is therefore truly platform independent. In modern browsers as well as Node.js it should run out of the box. In mobile apps or other environments lacking browser APIs, some external code may be necessary (see [below](#usage-in-constrained-environments) for details).
 
-Developed and curated by [TrustNXT](https://trustnxt.com) in Hamburg, Germany and licensed under the Apache 2.0 License. [Contributions welcome!](#contributing)
+This repository is a fork of the [`c2pa-ts`](https://github.com/TrustNXT/c2pa-ts) library. That  library is developed and curated by  of [TrustNXT](https://trustnxt.com) in Hamburg, Germany and licensed under the Apache 2.0 License. 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

@@ -1,5 +1,5 @@
 import { Asset } from '../asset';
-import { type CawgValidationOptions } from '../cawg';
+import { CawgTrustConfiguration, type CawgValidationOptions } from '../cawg';
 import { Signer } from '../cose';
 import { HashAlgorithm } from '../crypto';
 import { Crypto } from '../crypto/Crypto';
@@ -623,13 +623,13 @@ export class Manifest implements ManifestComponent {
      * @param validationOptions - Validation options
      * @returns ValidationResult containing any validation errors or successes
      */
-    private async validateIdentityAssertions(validationOptions?: CawgValidationOptions): Promise<ValidationResult> {
+    private async validateIdentityAssertions(validationOptions?: CawgTrustConfiguration): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         // Check for identity  assertions
         const identityAssertions: IdentityAssertion[] = this.assertions?.getIdentityAssertions() ?? [];
         for (const assertion of identityAssertions) {
-            result.merge(await assertion.validate(this, validationOptions?.cawg));
+            result.merge(await assertion.validate(this, validationOptions));
         }
         return result;
     }
