@@ -18,11 +18,10 @@ export class LocalSigner implements Signer {
         public certificate: X509Certificate,
         public chainCertificates: X509Certificate[] = [],
     ) {
-        const signingAlgorithm = Crypto.getAlgorithmFromPkcs8(privateKey);
-        if (!signingAlgorithm) throw new Error('Unable to determine signing algorithm from PKCS#8 private key');
-
-        const coseIdentifier = Algorithms.getCoseIdentifier(signingAlgorithm);
-        if (coseIdentifier === undefined) throw new Error(`Unsupported signing algorithm: ${signingAlgorithm.name}`);
+        const coseIdentifier = Crypto.getAlgorithmFromPkcs8(privateKey);
+        if (coseIdentifier === undefined) {
+            throw new Error('Unable to determine signing algorithm from PKCS#8 private key');
+        }
 
         this.algorithm = coseIdentifier;
     }

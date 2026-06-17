@@ -1,4 +1,5 @@
 import { fromBER, ObjectIdentifier, Sequence } from 'asn1js';
+import type { CoseAlgorithmIdentifier } from '../cose/Algorithms';
 import { CryptoProvider } from './CryptoProvider';
 import {
     hashAlgorithmFromOID,
@@ -222,11 +223,12 @@ export class Crypto {
     }
 
     /**
-     * Derives the signing algorithm from a DER-encoded PKCS#8 private key.
-     * For EC keys the hash is inferred by convention (P-256→SHA-256, P-384→SHA-384, P-521→SHA-512).
+     * Derives the COSE algorithm identifier from a DER-encoded PKCS#8 private key.
+     * For EC keys the identifier is inferred by convention (P-256→ES256, P-384→ES384, P-521→ES512).
+     * For RSA keys the identifier defaults to PS256.
      * Returns `undefined` when the key type cannot be recognised.
      */
-    public static getAlgorithmFromPkcs8(der: Uint8Array): SigningAlgorithm | undefined {
+    public static getAlgorithmFromPkcs8(der: Uint8Array): CoseAlgorithmIdentifier | undefined {
         try {
             const parsed = fromBER(der);
             if (parsed.offset === -1) return undefined;
@@ -247,22 +249,22 @@ export class Crypto {
 
             switch (oid) {
                 case OID_Ed25519:
-                    return { name: 'Ed25519' };
+                    return -8;
 
                 case OID_ECPublicKey: {
                     const paramsNode = algorithmIdentifier.valueBlock.value[1];
                     if (!(paramsNode instanceof ObjectIdentifier)) return undefined;
                     const namedCurve = namedCurveFromOID(paramsNode.valueBlock.toString());
                     if (!namedCurve) return undefined;
-                    const hash: HashAlgorithm =
-                        namedCurve === 'P-256' ? 'SHA-256'
-                        : namedCurve === 'P-384' ? 'SHA-384'
-                        : 'SHA-512';
-                    return { name: 'ECDSA', namedCurve, hash };
+                    return (
+                        namedCurve === 'P-256' ? -7
+                        : namedCurve === 'P-384' ? -35
+                        : -36
+                    );
                 }
 
                 case OID_RSAEncryption:
-                    return { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' };
+                    return -37;
 
                 default:
                     return undefined;

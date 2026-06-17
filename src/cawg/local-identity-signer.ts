@@ -1,6 +1,6 @@
 import { NamedActorRole, SignatureType, VerifiedIdentity } from '../cawg';
 import { bytesToBase64Url, privateJwkToPublicJwk } from '../cawg/utils';
-import { Algorithms, CoseAlgorithmIdentifier } from '../cose/Algorithms';
+import { CoseAlgorithmIdentifier } from '../cose/Algorithms';
 import { Crypto, ECDSASigningAlgorithm, Ed25519SigningAlgorithm, RSASigningAlgorithm } from '../crypto';
 import { IdentitySigner } from './identity-signer';
 
@@ -12,6 +12,8 @@ export interface LocalIdentitySignerOptions {
 }
 
 export class LocalIdentitySigner implements IdentitySigner {
+    public readonly algorithm: CoseAlgorithmIdentifier;
+
     get signingAlgorithm(): ECDSASigningAlgorithm | RSASigningAlgorithm | Ed25519SigningAlgorithm {
         switch (this.algorithm) {
             case CoseAlgorithmIdentifier.ES256:
@@ -52,32 +54,22 @@ export class LocalIdentitySigner implements IdentitySigner {
         return this.options.sigType ?? SignatureType.IdentityClaimsAggregation;
     }
 
-    static create(privateKey: Uint8Array, options: LocalIdentitySignerOptions) {
-        const signingAlg = Crypto.getAlgorithmFromPkcs8(privateKey);
-
-        if (!signingAlg) {
-            throw new Error('algorithm not supported');
-        }
-
-        const algorithm = Algorithms.getCoseIdentifier(signingAlg);
-
-        if (!algorithm) {
-            throw new Error('algorithm not supported');
-        }
-
-        return new LocalIdentitySigner(privateKey, algorithm, options);
-    }
-
     /**
      * Creates a signer instance using a private key.
      * @param privateKey - Private key in PKCS#8 format
-     * @param signingAlgorithm – algorithm identifier
+     * @param options – signer options
      */
     constructor(
         private readonly privateKey: Uint8Array,
-        readonly algorithm: CoseAlgorithmIdentifier,
         private readonly options: LocalIdentitySignerOptions,
-    ) {}
+    ) {
+        const coseIdentifier = Crypto.getAlgorithmFromPkcs8(privateKey);
+        if (coseIdentifier === undefined) {
+            throw new Error('Unable to determine signing algorithm from PKCS#8 private key');
+        }
+
+        this.algorithm = coseIdentifier;
+    }
 
     public sign(payload: Uint8Array): Promise<Uint8Array> {
         return Crypto.sign(payload, this.privateKey, this.signingAlgorithm);
