@@ -42,7 +42,7 @@ export class IdentityClaimsAggregation {
      * @param issuer - DID of the identity claims aggregator
      * @param verifiedIdentities - Array of verified identities (or single identity)
      * @param signerPayload - The signer_payload to bind to C2PA asset
-     * @param validFrom - Valid from date (RFC 3339 format)
+     * @param validFrom - Valid from date
      * @param options - Additional credential options
      * @param options.validUntil - Credential expiration date
      * @param options.useVc2 - Use W3C VC Data Model 2.0 (default: true)

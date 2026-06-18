@@ -19,11 +19,11 @@ export type VerifiedSignature = Signature & {
 
 export class ValidationFactory {
     /**
-     * Loads the asset from the provided file, checks for existing C2PA manifest in a JUMBF box, and creates a new manifest if none exists.
+     * Loads the asset from the provided file, reads any embedded C2PA manifest store from the JUMBF box, and validates the manifests if present.
      */
     public static async validate(
         file: File,
-        options: CawgValidationOptions = { cawg: {} },
+        options: CawgValidationOptions = {},
     ): Promise<{
         asset?: Asset;
         manifestStore?: VerifiedManifestStore;

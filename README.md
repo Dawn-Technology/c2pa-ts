@@ -10,7 +10,7 @@
 
 It does not use any native binaries or WebAssembly and is therefore truly platform independent. In modern browsers as well as Node.js it should run out of the box. In mobile apps or other environments lacking browser APIs, some external code may be necessary (see [below](#usage-in-constrained-environments) for details).
 
-This repository is a fork of the [`c2pa-ts`](https://github.com/TrustNXT/c2pa-ts) library. That  library is developed and curated by  of [TrustNXT](https://trustnxt.com) in Hamburg, Germany and licensed under the Apache 2.0 License. 
+This repository is a fork of the [`c2pa-ts`](https://github.com/TrustNXT/c2pa-ts) library. That  library is developed and curated by [TrustNXT](https://trustnxt.com) in Hamburg, Germany and licensed under the Apache 2.0 License. 
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

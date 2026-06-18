@@ -292,7 +292,7 @@ export interface CawgTrustConfiguration {
  */
 export interface CawgValidationOptions extends ValidationOptions {
     /** Trust configuration  */
-    cawg: CawgTrustConfiguration;
+    cawg?: CawgTrustConfiguration;
 }
 
 /**

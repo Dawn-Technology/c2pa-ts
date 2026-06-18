@@ -1,4 +1,4 @@
-# CAWG implementatiedocument
+# CAWG implementation document
 
 ## Fully supported:
 - Status codes:
@@ -32,7 +32,7 @@
 - DIDs
     - did:web
     - did:jwk
-- Algortithms 
+- Algortithms  
     - ES256
     - Ed25519
 
@@ -69,6 +69,3 @@
     - cawg.ica.revocation.unavailable
     - cawg.ica.credential.not_revoked
     - cawg.ica.credential.revoked
-
-## TODO
--
