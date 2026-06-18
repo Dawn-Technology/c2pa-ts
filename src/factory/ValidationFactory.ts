@@ -17,7 +17,7 @@ export type VerifiedSignature = Signature & {
     validationResult?: ValidationResult;
 };
 
-export class ValidatorFactory {
+export class ValidationFactory {
     /**
      * Loads the asset from the provided file, checks for existing C2PA manifest in a JUMBF box, and creates a new manifest if none exists.
      */
@@ -27,7 +27,7 @@ export class ValidatorFactory {
     ): Promise<{
         asset?: Asset;
         manifestStore?: VerifiedManifestStore;
-        manifestValidationResults?: Map<string, ValidationResult> | null;
+        validationResult?: Map<string, ValidationResult> | null;
     }> {
         const asset = await createAsset(file);
         const jumbfBytes = await asset.getManifestJUMBF();
@@ -38,8 +38,8 @@ export class ValidatorFactory {
         }
 
         const manifestStore = ManifestStore.read(SuperBox.fromBuffer(jumbfBytes)) as VerifiedManifestStore;
-        const manifestValidationResults = await ValidatorFactory.validateManifests(manifestStore, asset, options);
-        return { asset, manifestStore, manifestValidationResults };
+        const validationResult = await ValidationFactory.validateManifests(manifestStore, asset, options);
+        return { asset, manifestStore, validationResult };
     }
 
     public static async validateManifests(

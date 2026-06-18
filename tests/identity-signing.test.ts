@@ -50,7 +50,7 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
                 });
 
                 const identitySigner = await loadIdentitySigner(TEST_IDENTITIES[0]);
-                await IdentityAssertionFactory.add(manifest, asset, signer, timestampProvider, identitySigner);
+                await IdentityAssertionFactory.add(manifest, asset, signer, identitySigner, timestampProvider);
 
                 // Create the manifest signature
                 await manifest.sign(signer, timestampProvider);

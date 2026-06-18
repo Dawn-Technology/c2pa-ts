@@ -14,21 +14,19 @@ This repository is a fork of the [`c2pa-ts`](https://github.com/TrustNXT/c2pa-ts
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## Roadmap and current status
+## Current status
 
-This library is under active development and not fully functional yet. Proceed with caution!
-
-Anything that's not listed below is not currently planned to be implemented.
+This library is used for a pilot and not fully functional yet. Proceed with caution!
 
 ### Overall functionality
 
 - :white_check_mark: Reading manifests
-- :construction: Validating manifests (mostly implemented except chain of trust validation)
+- :white_check_mark: Validating manifests
 - :white_check_mark: Creating manifests
 
 :information_source: On C2PA versions: The library is targeted at C2PA specification 2.1, however data structures from older versions of the specification are also supported for backwards compatibility.
 
-:information_source: Although it is a separate project from C2PA, the library also includes support for several [CAWG](https://github.com/creator-assertions/) assertions.
+:information_source: On CAWG versions: The library is targeted at CAWG specification 1.2.
 
 ### Asset file formats
 
@@ -69,18 +67,102 @@ Anything that's not listed below is not currently planned to be implemented.
 
 ## Usage examples
 
-<details>
+<details><summary>Validate a file</summary>
 
-<summary>Reading and validating a manifest</summary>
+```typescript
+import { ExampleFactory, ValidationFactory } from '@dawn-technology/c2pa-ts/factory';
 
-Example usage in a Node.js environment:
+// Get a file. Replace it with your own file
+const file: File = ExampleFactory.getTestFile();
+
+// Validate the file
+const { validationResult } = await ValidationFactory.validate(file);
+console.log('Validation result', validationResult);
+```
+</details>
+
+<details><summary>Creating a manifest</summary>
+
+```typescript
+import { LocalSigner } from '@dawn-technology/c2pa-ts/cose';
+import { ExampleFactory, ManifestFactory } from '@dawn-technology/c2pa-ts/factory';
+
+// Get a file. Replace it with your own file
+const file: File = ExampleFactory.getTestFile();
+
+// Get a signer. Replace it with your own signer
+const signer: LocalSigner = ExampleFactory.getTestSigner();
+
+// Apply C2PA on a file and return the new file
+const fileWithManifest: File = await ManifestFactory.buildAndFinish(file, signer);
+```
+</details>
+
+<details><summary>Creating a manifest with an action, thumbnail and ingredient assertion</summary>
+
+```typescript
+import { LocalSigner } from '@dawn-technology/c2pa-ts/cose';
+import { ActionAssertionFactory, ExampleFactory, IngredientAssertionFactory, ManifestFactory, ThumbnailAssertionFactory } from '@dawn-technology/c2pa-ts/factory';
+import { ActionType, ThumbnailType } from '@dawn-technology/c2pa-ts/manifest';
+
+// Get a file. Replace it with your own file
+const file: File = ExampleFactory.getTestFile();
+
+// Get a thumbnail. Replace it with your own thumbnail
+const thumbnail: File = ExampleFactory.getTestFile();
+
+// Get a signer. Replace it with your own signer
+const signer: LocalSigner = ExampleFactory.getTestSigner();
+
+// Create a manifest
+const { manifestStore, manifest, previousManifest, asset } = await ManifestFactory.build(file, signer);
+
+// Add assertions
+await ThumbnailAssertionFactory.add(manifest, thumbnail, ThumbnailType.Claim);
+await ThumbnailAssertionFactory.add(manifest, thumbnail, ThumbnailType.Ingredient);
+await IngredientAssertionFactory.add(manifest, file, previousManifest);
+ActionAssertionFactory.add(manifest, [ActionType.C2paOpened]);
+
+// Finish manifest
+const fileWithManifest: File = await ManifestFactory.finish(asset, manifestStore, manifest, signer, file.name);
+```
+</details>
+
+<details><summary>Creating a manifest with an identity assertion</summary>
+
+```typescript
+import { LocalIdentitySigner } from '@dawn-technology/c2pa-ts/cawg';
+import { LocalSigner } from '@dawn-technology/c2pa-ts/cose';
+import { ExampleFactory, IdentityAssertionFactory, ManifestFactory } from '@dawn-technology/c2pa-ts/factory';
+
+// Get a file. Replace it with your own file
+const file: File = ExampleFactory.getTestFile();
+
+// Get a signer. Replace it with your own signer
+const signer: LocalSigner = ExampleFactory.getTestSigner();
+
+// Get an identity signer. Replace it with your own identity signer
+const identitySigner: LocalIdentitySigner = ExampleFactory.getTestIdentitySigner();
+
+// Create a manifest
+const { manifestStore, manifest, asset } = await ManifestFactory.build(file, signer);
+
+// Add identity assertions
+await IdentityAssertionFactory.add(manifest, asset, signer, identitySigner);
+
+// Finish manifest
+const fileWithManifest: File = await ManifestFactory.finish(asset, manifestStore, manifest, signer, file.name);
+```
+</details>
+
+<details><summary>Reading and validating a manifest in a Node.js environment</summary>
 
 ```typescript
 import * as fs from 'node:fs/promises';
-import { MalformedContentError } from '@trustnxt/c2pa-ts';
-import { Asset, createAsset } from '@trustnxt/c2pa-ts/asset';
-import { SuperBox } from '@trustnxt/c2pa-ts/jumbf';
-import { ManifestStore, ValidationResult, ValidationStatusCode } from '@trustnxt/c2pa-ts/manifest';
+import { MalformedContentError } from '@dawn-technology/c2pa-ts';
+import { Asset, createAsset } from '@dawn-technology/c2pa-ts/c2pa-ts/asset';
+import { SuperBox } from '@dawn-technology/c2pa-ts/c2pa-ts/jumbf';
+import { ManifestStore, ValidationResult, ValidationStatusCode } from '@dawn-technology/c2pa-ts/c2pa-ts/manifest';
 
 if (process.argv.length < 3) {
     console.error('Missing filename');
@@ -124,15 +206,6 @@ if (jumbf) {
     console.log('Validation result', validationResult);
 }
 ```
-
-</details>
-
-<details>
-
-<summary>Creating a manifest</summary>
-
-This still needs proper example code ([issue #58](https://github.com/TrustNXT/c2pa-ts/issues/58)). For now, you can check [`jpeg-signing.test.ts`](https://github.com/TrustNXT/c2pa-ts/blob/b6cfeaa17d24c82c5c0ecc163a43a646806b189e/tests/jpeg-signing.test.ts#L53-L83).
-
 </details>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -149,50 +222,11 @@ This error message comes from a dependency of c2pa-ts, `@peculiar/x509`, requiri
 
 Usage with JavaScript engines that lack WebCrypto and other browser APIs (such as JavaScriptCore on iOS) is entirely possible but will require some additional code. In particular, a custom `CryptoProvider` will need to be created and some polyfills might be required.
 
-For more information or a reference iOS implementation, <a href="mailto:mail@trustnxt.com">contact us</a>.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Contributing
-
-Contributions are welcome! This project uses [Bun](https://bun.sh) for development, testing, and building.
-
-### Getting Started
-
-1. **Install Bun**: Follow the [official installation guide](https://bun.sh/docs/installation).
-2. **Install Dependencies**:
-    ```bash
-    bun install
-    ```
-3. **Run Tests**:
-    ```bash
-    bun test
-    ```
-
-### Workflow
-
-- [Create an issue](https://github.com/TrustNXT/c2pa-ts/issues)
-- [Fork this repository](https://github.com/TrustNXT/c2pa-ts/fork)
-- [Open a pull request](https://github.com/TrustNXT/c2pa-ts/pulls)
-
-When you're done with your changes, we use [changesets](https://github.com/changesets/changesets) to manage release notes. Run `bun run changeset` to autogenerate notes to be appended to your pull request.
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## License
 
 Distributed under the Apache 2.0 License. See `LICENSE.md` for more information.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Contact
-
-Created and curated by TrustNXT GmbH, a proud member of CAI and C2PA.
-
-- [Website](https://trustnxt.com/)
-- [LinkedIn](https://www.linkedin.com/company/trustnxt/)
-
-This project is not affiliated with or endorsed by CAI, C2PA, CAWG, or any other organization except TrustNXT.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

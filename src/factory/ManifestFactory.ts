@@ -8,8 +8,12 @@ import { DataHashAssertionFactory } from './DataHashAssertionFactory';
 export class ManifestFactory {
     /**
      * Loads the asset from the provided file, checks for existing C2PA manifest in a JUMBF box, and creates a new manifest if none exists.
+     * If a manifest already exists, it will be loaded and returned along with the asset and manifest store.
+     * @param file - The input file representing the asset to be signed
+     * @param signer - The LocalSigner used for manifest creation
+     * @returns An object containing the loaded asset, manifest store, previous manifest (if any), and the new manifest
      */
-    public static async buildManifest(file: File, signer: LocalSigner) {
+    public static async build(file: File, signer: LocalSigner) {
         const instanceID = crypto.randomUUID();
         const asset = await createAsset(file);
         const jumbfBytes = await asset.getManifestJUMBF(); // depends on asset class
@@ -38,14 +42,22 @@ export class ManifestFactory {
 
     /**
      * Signs the manifest (ensures manifest space, updates the hard binding, and creates the signature).
+     * Then writes the manifest JUMBF box to the asset and exports the modified file with the embedded manifest.
+     * @param asset - The asset to which the manifest will be bound
+     * @param manifestStore - The manifest store containing the manifest to sign
+     * @param manifest - The manifest to sign
+     * @param signer - The LocalSigner used to create the signature
+     * @param timestampProvider - The LocalTimestampProvider used to timestamp the signature
+     * @param fileName - The name of the output file containing the signed manifest
+     * @returns A File containing the modified asset data with the embedded C2PA manifest
      */
-    public static async signManifest(
+    public static async finish(
         asset: Asset,
         manifestStore: ManifestStore,
         manifest: Manifest,
         signer: LocalSigner,
-        timestampProvider: LocalTimestampProvider,
         fileName: string,
+        timestampProvider?: LocalTimestampProvider,
     ): Promise<File> {
         // Get or create a data hash assertion (hard binding)
         const dataHashAssertion = DataHashAssertionFactory.ensure(manifest);
@@ -66,5 +78,21 @@ export class ManifestFactory {
         const bytes = await asset.getDataRange();
 
         return new File([new Uint8Array(bytes)], fileName, { type: asset.mimeType || 'application/octet-stream' });
+    }
+
+    /**
+     * Builds a manifest for the given file, signs it, and embeds it into the file.
+     * @param file - The file to which the manifest will be bound
+     * @param signer - The LocalSigner used to create the signature
+     * @param timestampProvider - The LocalTimestampProvider used to timestamp the signature
+     * @returns A File containing the modified asset data with the embedded C2PA manifest
+     */
+    public static async buildAndFinish(
+        file: File,
+        signer: LocalSigner,
+        timestampProvider?: LocalTimestampProvider,
+    ): Promise<File> {
+        const { asset, manifestStore, manifest } = await this.build(file, signer);
+        return this.finish(asset, manifestStore, manifest, signer, file.name, timestampProvider);
     }
 }

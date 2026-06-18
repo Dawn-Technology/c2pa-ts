@@ -22,8 +22,8 @@ export class IdentityAssertionFactory {
         manifest: Manifest,
         asset: Asset,
         signer: Signer,
-        timestampProvider: LocalTimestampProvider,
         identitySigners: IdentitySigner,
+        timestampProvider?: LocalTimestampProvider,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion }>;
 
     /**
@@ -34,16 +34,16 @@ export class IdentityAssertionFactory {
      * @param manifest - Manifest being populated and signed
      * @param asset - Asset the manifest is bound to
      * @param signer - Primary C2PA signer used for manifest signing
-     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
      * @param identitySigners - Identity signers used to produce ICA credentials
+     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
      * @returns Created hard-binding assertion and identity assertions
      */
     public static async add(
         manifest: Manifest,
         asset: Asset,
         signer: Signer,
-        timestampProvider: LocalTimestampProvider,
         identitySigners: IdentitySigner[],
+        timestampProvider?: LocalTimestampProvider,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion[] }>;
 
     /**
@@ -59,16 +59,16 @@ export class IdentityAssertionFactory {
      * @param manifest - Manifest being populated and signed
      * @param asset - Asset the manifest is bound to
      * @param signer - Primary C2PA signer used for manifest signing
-     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
      * @param identitySigners - One or more identity signers
+     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
      * @returns Created hard-binding assertion and identity assertion(s)
      */
     public static async add(
         manifest: Manifest,
         asset: Asset,
         signer: Signer,
-        timestampProvider: LocalTimestampProvider,
         identitySigners: IdentitySigner | IdentitySigner[],
+        timestampProvider?: LocalTimestampProvider,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion | IdentityAssertion[] }> {
         // Get or create a data hash assertion (hard binding)
         const dataHashAssertion = DataHashAssertionFactory.ensure(manifest);
