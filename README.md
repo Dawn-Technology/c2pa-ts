@@ -66,6 +66,7 @@ This library is used for a pilot and not fully functional yet. Proceed with caut
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Usage examples
+An example implementation is the GitHub repository [Dawn-Technology/c2pa-mcnl](https://github.com/Dawn-Technology/c2pa-mcnl), which includes both a signing web application and a verification web application.
 
 <details><summary>Validate a file</summary>
 
