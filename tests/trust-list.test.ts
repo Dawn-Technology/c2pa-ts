@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { beforeAll, describe, it } from 'bun:test';
 import { Asset, AssetType, BMFF, JPEG, PNG } from '../src/asset';
-import { ValidationOptions } from '../src/cose';
+import { CawgValidationOptions } from '../src/cawg';
 import { SuperBox } from '../src/jumbf';
 import { ManifestStore, ValidationResult, ValidationStatusCode } from '../src/manifest';
 import { BinaryHelper } from '../src/util';
@@ -200,7 +200,7 @@ const testFiles: Record<string, TestExpectations> = {
     },
 };
 
-const validationOptions: ValidationOptions = {};
+const validationOptions: CawgValidationOptions = { cawg: {} };
 
 beforeAll(async () => {
     validationOptions.trustAnchors = await getTrustAnchors('tests/fixtures/trust-list-wrong.pem');
