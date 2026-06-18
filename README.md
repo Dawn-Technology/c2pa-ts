@@ -26,7 +26,7 @@ This library is used for a pilot and not fully functional yet. Proceed with caut
 
 :information_source: On C2PA versions: The library is targeted at C2PA specification 2.1, however data structures from older versions of the specification are also supported for backwards compatibility.
 
-:information_source: On CAWG versions: The library is targeted at CAWG specification 1.2.
+:information_source: On CAWG versions: The library is targeted at CAWG specification 1.2. For more detail what is exactly supported see the [CAWG implementation document](cawg/documentation.md)
 
 ### Asset file formats
 
