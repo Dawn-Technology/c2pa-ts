@@ -9,8 +9,8 @@ import * as JUMBF from '../jumbf';
 import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
 import {
+    CawgTrustConfiguration,
     SignatureType,
-    type CawgValidationOptions,
     type ExpectedCountersignerMap,
     type HashedUriMap,
     type HashMap,
@@ -30,19 +30,34 @@ import {
 } from './utils.js';
 
 export class IdentityAssertionValidator {
+    /** The C2PA manifest that contains the assertion being validated */
     manifest: Manifest;
+    /** The identity assertion under validation */
     assertion: IdentityAssertion;
+    /** Label of the assertion inside the manifest */
     assertionLabel: string;
+    /** Source JUMBF box used for validation status location */
     sourceBox: JUMBF.SuperBox;
-    options: CawgValidationOptions;
+    /** CAWG trust configuration */
+    options: CawgTrustConfiguration;
+    /** Aggregated validation result for this assertion */
     result: ValidationResult;
 
+    /**
+     * Create a validator for a CAWG identity assertion.
+     *
+     * @param manifest - Manifest containing the assertion
+     * @param assertion - Identity assertion to validate
+     * @param assertionLabel - Assertion label in the claim graph
+     * @param sourceBox - JUMBF box that backs this assertion
+     * @param options - CAWG trust configuration
+     */
     constructor(
         manifest: Manifest,
         assertion: IdentityAssertion,
         assertionLabel: string,
         sourceBox: JUMBF.SuperBox,
-        options: CawgValidationOptions = {},
+        options: CawgTrustConfiguration = {},
     ) {
         this.manifest = manifest;
         this.assertion = assertion;

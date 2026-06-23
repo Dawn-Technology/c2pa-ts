@@ -41,6 +41,16 @@ export interface ExpectedCountersignerMap {
 }
 
 /**
+ * Raw identity assertion structure as stored in CBOR
+ */
+export interface RawIdentityAssertion {
+    signer_payload: SignerPayloadMap;
+    signature: Uint8Array;
+    pad1: Uint8Array;
+    pad2?: Uint8Array;
+}
+
+/**
  * Named actor roles as defined in CAWG specification
  */
 export enum NamedActorRole {

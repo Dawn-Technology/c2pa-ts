@@ -1,17 +1,44 @@
+/**
+ * Local Identity Signer
+ * Creates CAWG identity assertions using local cryptographic keys
+ *
+ * Implements signing of CAWG identity assertions using local key material.
+ * Supports ECDSA, RSA-PSS, and Ed25519 algorithms for signing.
+ *
+ * @module cawg/local-identity-signer
+ */
 import { NamedActorRole, SignatureType, VerifiedIdentity } from '../cawg';
 import { bytesToBase64Url, privateJwkToPublicJwk } from '../cawg/utils';
 import { CoseAlgorithmIdentifier } from '../cose/Algorithms';
 import { Crypto, ECDSASigningAlgorithm, Ed25519SigningAlgorithm, RSASigningAlgorithm } from '../crypto';
 import { IdentitySigner } from './identity-signer';
 
+/**
+ * Configuration options for LocalIdentitySigner
+ */
 export interface LocalIdentitySignerOptions {
+    /** The verified identity or identities for this signer */
     readonly verifiedIdentity: VerifiedIdentity | VerifiedIdentity[];
+    /** Named actor roles describing relationship to assets */
     readonly roles: NamedActorRole[];
+    /** Signature type (defaults to IdentityClaimsAggregation) */
     readonly sigType?: SignatureType;
+    /** Optional explicit issuer DID (auto-generated if not provided) */
     readonly issuerDid?: string;
 }
 
+/**
+ * Local implementation of IdentitySigner for creating CAWG identity assertions
+ *
+ * Creates and signs identity assertions using locally-held private keys.
+ * The signer derives a did:jwk from the public key if no explicit DID is provided.
+ */
 export class LocalIdentitySigner implements IdentitySigner {
+    /**
+     * Get the Web Crypto signing algorithm for the configured COSE algorithm
+     *
+     * Maps COSE algorithm identifiers to Web Crypto Algorithm specifications.
+     */
     public readonly algorithm: CoseAlgorithmIdentifier;
 
     get signingAlgorithm(): ECDSASigningAlgorithm | RSASigningAlgorithm | Ed25519SigningAlgorithm {
@@ -34,6 +61,11 @@ export class LocalIdentitySigner implements IdentitySigner {
         }
     }
 
+    /**
+     * Get the issuer DID
+     *
+     * Returns an explicitly-configured issuer DID, or generates a did:jwk from the public key.
+     */
     get issuerDid(): Promise<string> {
         if (this.options.issuerDid) {
             return Promise.resolve(this.options.issuerDid);
@@ -42,20 +74,30 @@ export class LocalIdentitySigner implements IdentitySigner {
         }
     }
 
+    /**
+     * Get the verified identity
+     */
     get verifiedIdentity(): VerifiedIdentity | VerifiedIdentity[] {
         return this.options.verifiedIdentity;
     }
 
+    /**
+     * Get the named actor roles
+     */
     get roles(): NamedActorRole[] {
         return this.options.roles;
     }
 
+    /**
+     * Get the signature type
+     */
     get signatureType(): SignatureType {
         return this.options.sigType ?? SignatureType.IdentityClaimsAggregation;
     }
 
     /**
-     * Creates a signer instance using a private key.
+     * Creates a signer instance using a private key
+     *
      * @param privateKey - Private key in PKCS#8 format
      * @param options – signer options
      */
@@ -71,10 +113,23 @@ export class LocalIdentitySigner implements IdentitySigner {
         this.algorithm = coseIdentifier;
     }
 
+    /**
+     * Sign a payload using the local private key
+     *
+     * @param payload - The bytes to sign
+     * @returns Promise resolving to the signature bytes
+     */
     public sign(payload: Uint8Array): Promise<Uint8Array> {
         return Crypto.sign(payload, this.privateKey, this.signingAlgorithm);
     }
 
+    /**
+     * Generate a did:jwk from the local public key
+     *
+     * Exports the public key as JWK, canonicalizes it, and encodes it as a did:jwk DID.
+     *
+     * @returns Promise resolving to the generated did:jwk DID
+     */
     public async getDefaultDid(): Promise<string> {
         const privateKey = await crypto.subtle.importKey(
             'pkcs8',

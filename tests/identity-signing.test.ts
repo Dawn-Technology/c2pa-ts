@@ -4,6 +4,7 @@ import { afterAll, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
 import { NamedActorRole, SignatureType, VerifiedIdentity, VerifiedIdentityType } from '../src/cawg';
 import { Crypto } from '../src/crypto';
+import { IdentityAssertionFactory } from '../src/factory';
 import { CBORBox, SuperBox } from '../src/jumbf';
 import {
     Assertion,
@@ -49,7 +50,7 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
                 });
 
                 const identitySigner = await loadIdentitySigner(TEST_IDENTITIES[0]);
-                await IdentityAssertion.create(manifest, asset, signer, timestampProvider, identitySigner);
+                await IdentityAssertionFactory.add(manifest, asset, signer, identitySigner, timestampProvider);
 
                 // Create the manifest signature
                 await manifest.sign(signer, timestampProvider);

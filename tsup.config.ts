@@ -1,7 +1,6 @@
 import { execSync } from 'node:child_process';
 import { defineConfig } from 'tsup';
 
-
 const gitRevision = execSync('git rev-parse --short HEAD').toString().trim();
 const version = process.env.npm_package_version;
 
@@ -12,6 +11,7 @@ export default defineConfig({
         'cawg/index': 'src/cawg/index.ts',
         'cose/index': 'src/cose/index.ts',
         'crypto/index': 'src/crypto/index.ts',
+        'factory/index': 'src/factory/index.ts',
         'jumbf/index': 'src/jumbf/index.ts',
         'manifest/index': 'src/manifest/index.ts',
         'rfc3161/index': 'src/rfc3161/index.ts',
