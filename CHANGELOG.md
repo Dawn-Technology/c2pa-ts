@@ -1,5 +1,11 @@
 # c2pa-ts
 
+## 0.16.0
+
+### Minor Changes
+
+- Add factories to simply creation, validation and signing of the manifests
+
 ## 0.15.2
 
 ### Patch Changes
