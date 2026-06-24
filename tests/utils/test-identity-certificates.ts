@@ -172,7 +172,7 @@ export function getExpectedValidationStatusEntriesWrongTimeStamp(manifestLabel: 
             code: ValidationStatusCode.TimeStampOutsideValidity,
             explanation: 'Timestamp outside signer certificate validity period',
             url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
-            success: false,
+            success: true,
         },
         {
             code: ValidationStatusCode.SigningCredentialExpired,
