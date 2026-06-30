@@ -54,7 +54,8 @@
         "dist"
     ],
     "publishConfig": {
-        "access": "public"
+        "access": "public",
+        "registry": "https://npm.pkg.github.com"
     },
     "devDependencies": {
         "@changesets/cli": "^2.27.9",
