@@ -1,5 +1,11 @@
 # c2pa-ts
 
+## 0.17.0
+
+### Minor Changes
+
+- Update timestamp validation to use informational messages instead of errors
+
 ## 0.16.0
 
 ### Minor Changes
