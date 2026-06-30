@@ -268,7 +268,11 @@ export class Signature {
 
         // Validate single timestamp requirement per spec v2.1
         if (this.timestampTokens.length > 1) {
-            result.addError(ValidationStatusCode.TimeStampMalformed, sourceBox, 'Multiple timestamps are not allowed');
+            result.addInformational(
+                ValidationStatusCode.TimeStampMalformed,
+                sourceBox,
+                'Multiple timestamps are not allowed',
+            );
             return result;
         }
 
@@ -292,8 +296,8 @@ export class Signature {
 
                 const hashAlgorithm = Crypto.getHashAlgorithmByOID(tstInfo.messageImprint.hashAlgorithm.algorithmId);
                 if (!hashAlgorithm) {
-                    result.addError(
-                        ValidationStatusCode.AlgorithmUnsupported,
+                    result.addInformational(
+                        ValidationStatusCode.TimeStampUntrusted,
                         sourceBox,
                         'Unsupported timestamp hash algorithm',
                     );
@@ -303,7 +307,7 @@ export class Signature {
                 // Validate timestamp falls within signer validity
                 if (this.certificate) {
                     if (tstInfo.genTime < this.certificate.notBefore || tstInfo.genTime > this.certificate.notAfter) {
-                        result.addError(
+                        result.addInformational(
                             ValidationStatusCode.TimeStampOutsideValidity,
                             sourceBox,
                             'Timestamp outside signer certificate validity period',
@@ -324,30 +328,19 @@ export class Signature {
                         new Uint8Array(tstInfo.messageImprint.hashedMessage.getValue()),
                     )
                 ) {
-                    result.addError(ValidationStatusCode.TimeStampMismatch, sourceBox);
+                    result.addInformational(ValidationStatusCode.TimeStampMismatch, sourceBox);
                     continue;
                 }
 
                 if (!(await Signature.verifySignedDataSignature(signedData))) {
-                    result.addError(ValidationStatusCode.TimeStampMismatch, sourceBox);
+                    result.addInformational(ValidationStatusCode.TimeStampMismatch, sourceBox);
                     continue;
-                }
-
-                // Validate TSA certificates
-                for (const cert of signedData.certificates ?? []) {
-                    if (!(cert instanceof pkijs.Certificate)) continue;
-                    const x509Cert = new X509Certificate(cert.toSchema().toBER());
-                    const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
-                    if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
-                        result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
-                        continue;
-                    }
                 }
 
                 if (
                     !(await Signature.validateTimestampSignerTrust(signedData, tstInfo.genTime, timestampTrustAnchors))
                 ) {
-                    result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
+                    result.addInformational(ValidationStatusCode.TimeStampUntrusted, sourceBox);
                     continue;
                 }
 
@@ -355,7 +348,7 @@ export class Signature {
                 result.addInformational(ValidationStatusCode.TimeStampTrusted, sourceBox);
                 break;
             } catch {
-                result.addError(ValidationStatusCode.TimeStampMalformed, sourceBox);
+                result.addInformational(ValidationStatusCode.TimeStampMalformed, sourceBox);
                 continue;
             }
         }
@@ -449,6 +442,7 @@ export class Signature {
         }
 
         const signerX509Certificate = new X509Certificate(signerCertificate.toSchema().toBER());
+
         const signerCertificateValidation = await Signature.validateCertificate(
             signerX509Certificate,
             timestamp,
@@ -745,10 +739,16 @@ export class Signature {
     }
 
     private static async verifySignature(cert: X509Certificate, issuer: X509Certificate): Promise<boolean> {
-        return cert.verify({
-            publicKey: issuer.publicKey,
-            signatureOnly: true,
-        });
+        try {
+            return await cert.verify({
+                publicKey: issuer.publicKey,
+                signatureOnly: true,
+            });
+        } catch {
+            // Handle RangeError or other errors during signature verification
+            // This can occur with malformed ECDSA signatures
+            return false;
+        }
     }
 
     /**
