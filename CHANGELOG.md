@@ -1,5 +1,11 @@
 # c2pa-ts
 
+## 0.17.1
+
+### Patch Changes
+
+- 7574d19: Update packaging CI logic. Nothing changed, testing whether CI actually publishes the package.
+
 ## 0.17.0
 
 ### Minor Changes
