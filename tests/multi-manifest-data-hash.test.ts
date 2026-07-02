@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { describe, it } from 'bun:test';
 import { createAsset } from '../src/asset';
+import { LocalSigner } from '../src/cose';
 import { ManifestFactory, ValidationFactory } from '../src/factory';
 import { SuperBox } from '../src/jumbf';
 import { ManifestStore, ValidationStatusCode } from '../src/manifest';
@@ -12,14 +13,19 @@ const sourceFile = 'tests/fixtures/trustnxt-icon.jpg';
 describe('Multi-manifest data hash regression', () => {
     it('prior manifest data hash should remain valid after a second manifest is added', async () => {
         const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
+        const localSigner = signer as LocalSigner;
 
         // Step 1: sign the original file to produce a file with manifest #1
         const buf = await fs.readFile(sourceFile);
         const file1 = new File([buf], 'trustnxt-icon.jpg', { type: 'image/jpeg' });
-        const fileWithManifest1 = await ManifestFactory.buildAndFinish(file1, signer, timestampProvider);
+        const fileWithManifest1 = await ManifestFactory.buildAndFinish(file1, localSigner, timestampProvider);
 
         // Step 2: sign the result again to produce a file with both manifest #1 and manifest #2
-        const fileWithManifest2 = await ManifestFactory.buildAndFinish(fileWithManifest1, signer, timestampProvider);
+        const fileWithManifest2 = await ManifestFactory.buildAndFinish(
+            fileWithManifest1,
+            localSigner,
+            timestampProvider,
+        );
 
         // Step 3: read back the manifest store from the final file
         const asset = await createAsset(fileWithManifest2);
