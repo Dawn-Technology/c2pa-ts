@@ -1,5 +1,11 @@
 # c2pa-ts
 
+## 0.17.2
+
+### Patch Changes
+
+- adjust exclusion ranges in data hash validation to handle multi-manifest scenarios
+
 ## 0.17.1
 
 ### Patch Changes
