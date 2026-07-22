@@ -137,7 +137,27 @@ export class DataHashAssertion extends Assertion implements HashAssertion {
             return ValidationResult.error(ValidationStatusCode.AssertionCBORInvalid, this.sourceBox);
         }
 
-        const hash = await AssertionUtils.hashWithExclusions(asset, this.exclusions, this.algorithm);
+        // When a subsequent manifest is added to the asset the C2PA box grows, but the
+        // exclusion range stored in this (prior) assertion still reflects the original,
+        // smaller size.  Any bytes that now belong to the larger C2PA box but fall outside
+        // the stored range would be included in the hash, causing a spurious mismatch.
+        // To handle this, expand each stored exclusion whose start offset matches the
+        // current C2PA box start to cover the full current C2PA box length.
+        let exclusions = this.exclusions;
+        try {
+            const currentRange = asset.getHashExclusionRange();
+            const adjusted = this.exclusions.map(e =>
+                !e.offsetMarker && e.start === currentRange.start && e.length < currentRange.length ?
+                    { ...e, length: currentRange.length }
+                :   e,
+            );
+            exclusions = adjusted;
+        } catch {
+            // asset.getHashExclusionRange() throws when no manifest space is reserved;
+            // fall back to the stored exclusions
+        }
+
+        const hash = await AssertionUtils.hashWithExclusions(asset, exclusions, this.algorithm);
 
         if (BinaryHelper.bufEqual(this.hash, hash)) {
             return ValidationResult.success(ValidationStatusCode.AssertionDataHashMatch, this.sourceBox);
