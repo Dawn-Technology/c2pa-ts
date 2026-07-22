@@ -10,7 +10,7 @@
 
 It does not use any native binaries or WebAssembly and is therefore truly platform independent. In modern browsers as well as Node.js it should run out of the box. In mobile apps or other environments lacking browser APIs, some external code may be necessary (see [below](#usage-in-constrained-environments) for details).
 
-This repository is a fork of the [`c2pa-ts`](https://github.com/TrustNXT/c2pa-ts) library. That  library is developed and curated by [TrustNXT](https://trustnxt.com) in Hamburg, Germany and licensed under the Apache 2.0 License. 
+This repository is a fork of the [`c2pa-ts`](https://github.com/TrustNXT/c2pa-ts) library. That library is developed and curated by [TrustNXT](https://trustnxt.com) in Hamburg, Germany and licensed under the Apache 2.0 License.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -26,7 +26,7 @@ This library is used for a pilot and not fully functional yet. Proceed with caut
 
 :information_source: On C2PA versions: The library is targeted at C2PA specification 2.1, however data structures from older versions of the specification are also supported for backwards compatibility.
 
-:information_source: On CAWG versions: The library is targeted at CAWG specification 1.2. For more detail what is exactly supported see the [CAWG implementation document](cawg/documentation.md)
+:information_source: On CAWG versions: The library is targeted at CAWG specification 1.2. For more detail what is exactly supported see the [CAWG implementation document](./src/cawg/documentation.md).
 
 ### Asset file formats
 
@@ -66,6 +66,7 @@ This library is used for a pilot and not fully functional yet. Proceed with caut
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Usage examples
+
 An example implementation is the GitHub repository [Dawn-Technology/c2pa-mcnl](https://github.com/Dawn-Technology/c2pa-mcnl), which includes both a signing web application and a verification web application.
 
 <details><summary>Validate a file</summary>
@@ -80,6 +81,7 @@ const file: File = ExampleFactory.getTestFile();
 const { validationResult } = await ValidationFactory.validate(file);
 console.log('Validation result', validationResult);
 ```
+
 </details>
 
 <details><summary>Creating a manifest</summary>
@@ -97,13 +99,20 @@ const signer: LocalSigner = ExampleFactory.getTestSigner();
 // Apply C2PA on a file and return the new file
 const fileWithManifest: File = await ManifestFactory.buildAndFinish(file, signer);
 ```
+
 </details>
 
 <details><summary>Creating a manifest with an action, thumbnail and ingredient assertion</summary>
 
 ```typescript
 import { LocalSigner } from '@dawn-technology/c2pa-ts/cose';
-import { ActionAssertionFactory, ExampleFactory, IngredientAssertionFactory, ManifestFactory, ThumbnailAssertionFactory } from '@dawn-technology/c2pa-ts/factory';
+import {
+    ActionAssertionFactory,
+    ExampleFactory,
+    IngredientAssertionFactory,
+    ManifestFactory,
+    ThumbnailAssertionFactory,
+} from '@dawn-technology/c2pa-ts/factory';
 import { ActionType, ThumbnailType } from '@dawn-technology/c2pa-ts/manifest';
 
 // Get a file. Replace it with your own file
@@ -127,6 +136,7 @@ ActionAssertionFactory.add(manifest, [ActionType.C2paOpened]);
 // Finish manifest
 const fileWithManifest: File = await ManifestFactory.finish(asset, manifestStore, manifest, signer, file.name);
 ```
+
 </details>
 
 <details><summary>Creating a manifest with an identity assertion</summary>
@@ -154,6 +164,7 @@ await IdentityAssertionFactory.add(manifest, asset, signer, identitySigner);
 // Finish manifest
 const fileWithManifest: File = await ManifestFactory.finish(asset, manifestStore, manifest, signer, file.name);
 ```
+
 </details>
 
 <details><summary>Reading and validating a manifest in a Node.js environment</summary>
@@ -207,6 +218,7 @@ if (jumbf) {
     console.log('Validation result', validationResult);
 }
 ```
+
 </details>
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
