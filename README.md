@@ -65,6 +65,17 @@ This library is used for a pilot and not fully functional yet. Proceed with caut
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Install
+
+We're using GitHub Packages for the c2pa-ts repository as the package registry. To install `c2pa-ts` as dependency, you need to authenticate with GitHub Packages. You can do this by creating a personal access token (PAT) on GitHub and configuring your npm client to use it.
+
+See the GitHub documentation for detailed instructions on how to authenticate with GitHub Packages.
+
+Create the PAT and add the following to your ~/.npmrc file:
+
+@dawn-technology:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=TOKEN
+
 ## Usage examples
 
 An example implementation is the GitHub repository [Dawn-Technology/c2pa-mcnl](https://github.com/Dawn-Technology/c2pa-mcnl), which includes both a signing web application and a verification web application.
