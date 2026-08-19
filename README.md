@@ -67,14 +67,16 @@ This library is used for a pilot and not fully functional yet. Proceed with caut
 
 ## Install
 
-We're using GitHub Packages for the c2pa-ts repository as the package registry. To install `c2pa-ts` as dependency, you need to authenticate with GitHub Packages. You can do this by creating a personal access token (PAT) on GitHub and configuring your npm client to use it.
+We're using GitHub Packages for the [c2pa-ts](https://github.com/Dawn-Technology/c2pa-ts) repository as the package registry. To install the package, you need to authenticate with GitHub Packages. You can do this by creating a personal access token (PAT) on GitHub and configuring your npm client to use it.
 
-See the GitHub documentation for detailed instructions on how to authenticate with GitHub Packages.
+See the [GitHub documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry#installing-a-package) for detailed instructions on how to authenticate with GitHub Packages.
 
-Create the PAT and add the following to your ~/.npmrc file:
+Create the PAT and add the following to your `~/.npmrc` file:
 
+```
 @dawn-technology:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=TOKEN
+```
 
 ## Usage examples
 
