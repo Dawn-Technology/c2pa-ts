@@ -42,16 +42,18 @@ import {
     X509CertificateCreateSelfSignedParams,
     X509CertificateGenerator,
 } from '@peculiar/x509';
-import { beforeAll, describe, it } from 'bun:test';
+import { beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import { JPEG } from '../src/asset';
 import { CoseAlgorithmIdentifier, LocalSigner, TrustList } from '../src/cose';
 import { SuperBox } from '../src/jumbf';
-import { DataHashAssertion, ManifestStore, ValidationResult } from '../src/manifest';
+import { DataHashAssertion, ManifestStore, ValidationResult, ValidationStatusCode } from '../src/manifest';
 import { LocalTimestampProvider } from '../src/rfc3161';
 import {
     getExpectedValidationStatusEntries,
+    getExpectedValidationStatusEntriesClaimSignatureOutsideValidity,
     getExpectedValidationStatusEntriesInvalid,
     getExpectedValidationStatusEntriesUntrusted,
+    getExpectedValidationStatusEntriesUntrustedTimeStamp,
     getExpectedValidationStatusEntriesWrongTimeStamp,
 } from './utils/testCertificates';
 
@@ -256,11 +258,13 @@ async function getLeafExtensions(subjectPublicKey: CryptoKey, issuerPublicKey: C
  *                           (e.g. `notBefore`, `notAfter`).
  * @param extensionChanges - Optional map of index → replacement {@link Extension} (or `undefined`
  *                           to remove). Applied via {@link applyExtensionChanges}.
+ * @param setAsTrustAnchor  - Whether to set the generated root certificate as the trust anchor (default: `true`).
  * @returns A tuple of `[keyPair, certificate]`.
  */
 async function createRootCertificate(
     partial?: Partial<X509CertificateCreateSelfSignedParams>,
     extensionChanges?: ExtensionChangeMap,
+    setAsTrustAnchor: boolean = true,
 ): Promise<[CryptoKeyPair, X509Certificate]> {
     const rootKeys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
     const extensions = await getRootExtensions(rootKeys.publicKey);
@@ -275,7 +279,9 @@ async function createRootCertificate(
         },
         crypto,
     );
-    TrustList.setTrustAnchors([rootCert]);
+    if (setAsTrustAnchor) {
+        TrustList.setTrustAnchors([rootCert]);
+    }
 
     return [rootKeys, rootCert];
 }
@@ -395,7 +401,7 @@ describe('Certificate Chain Validation', () => {
      * {@link LocalSigner}. Individual tests that need alternative certificates
      * generate their own instances, but reuse these as a baseline.
      */
-    beforeAll(async () => {
+    beforeEach(async () => {
         // Generate the default certificate chain: root → intermediate → leaf
         [rootKeys, rootCert] = await createRootCertificate();
         [intermediateKeys, intermediateCert] = await createIntermediateCertificate(rootCert, rootKeys);
@@ -405,8 +411,8 @@ describe('Certificate Chain Validation', () => {
         timestampProvider = new LocalTimestampProvider(leafCert, await toPkcs8Bytes(leafKeys.privateKey), [
             intermediateCert,
         ]);
-        TrustList.setTimestampTrustAnchors([rootCert, leafCert]);
-
+        TrustList.setTimestampTrustAnchors([rootCert]);
+        
         // Create a COSE signer backed by the leaf certificate (ES256 / P-256)
         signer = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), CoseAlgorithmIdentifier.ES256, leafCert, [
             intermediateCert,
@@ -515,12 +521,6 @@ describe('Certificate Chain Validation', () => {
                 crypto,
             );
 
-            // Create timestamp provider
-            const otherTimestampProvider = new LocalTimestampProvider(
-                leafCert,
-                await toPkcs8Bytes(leafKeys.privateKey),
-                [wrongIntermediateCert],
-            );
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(leafKeys.privateKey),
@@ -529,7 +529,7 @@ describe('Certificate Chain Validation', () => {
                 [wrongIntermediateCert],
             );
 
-            const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
+            const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
             // check individual codes
             assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrusted(label));
@@ -578,46 +578,45 @@ describe('Certificate Chain Validation', () => {
             assert.ok(validationResult.isValid, 'Validation result should be valid');
         });
 
-        // // TODO not working
-        // it('should deal with irrelevant timestamp certificates in the chain', async () => {
-        //     const anyKeys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
-        //         'sign',
-        //         'verify',
-        //     ]);
-        //     const anyCert = await X509CertificateGenerator.create(
-        //         {
-        //             serialNumber: '04',
-        //             subject: `C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Irrelevant`,
-        //             issuer: rootCert.subject,
-        //             signingKey: anyKeys.privateKey,
-        //             publicKey: anyKeys.publicKey,
-        //             signingAlgorithm: { name: 'ECDSA', hash: 'SHA-256' },
-        //         },
-        //         crypto,
-        //     );
+        it('should deal with irrelevant timestamp certificates in the chain', async () => {
+            const anyKeys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, [
+                'sign',
+                'verify',
+            ]);
+            const anyCert = await X509CertificateGenerator.create(
+                {
+                    serialNumber: '04',
+                    subject: `C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Irrelevant`,
+                    issuer: rootCert.subject,
+                    signingKey: anyKeys.privateKey,
+                    publicKey: anyKeys.publicKey,
+                    signingAlgorithm: { name: 'ECDSA', hash: 'SHA-256' },
+                },
+                crypto,
+            );
 
-        //     // Create timestamp provider
-        //     const otherTimestampProvider = new LocalTimestampProvider(
-        //         leafCert,
-        //         await toPkcs8Bytes(leafKeys.privateKey),
-        //         [intermediateCert],
-        //     );
-        //     // Create a signer
-        //     const otherSigner = new LocalSigner(
-        //         await toPkcs8Bytes(leafKeys.privateKey),
-        //         CoseAlgorithmIdentifier.ES256,
-        //         leafCert,
-        //         [intermediateCert, anyCert],
-        //     );
+            // Create timestamp provider
+            const otherTimestampProvider = new LocalTimestampProvider(
+                leafCert,
+                await toPkcs8Bytes(leafKeys.privateKey),
+                [intermediateCert],
+            );
+            // Create a signer
+            const otherSigner = new LocalSigner(
+                await toPkcs8Bytes(leafKeys.privateKey),
+                CoseAlgorithmIdentifier.ES256,
+                leafCert,
+                [intermediateCert, anyCert],
+            );
 
-        //     const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
+            const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
-        //     // check individual codes
-        //     assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntries(label));
+            // check individual codes
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntries(label));
 
-        //     // // check overall validity
-        //     assert.ok(validationResult.isValid, 'Validation result should be valid');
-        // });
+            // // check overall validity
+            assert.ok(validationResult.isValid, 'Validation result should be valid');
+        });
     });
 
     describe('3. Certificate Validity Period', () => {
@@ -649,8 +648,7 @@ describe('Certificate Chain Validation', () => {
                 [otherIntermediateCert],
             );
 
-            TrustList.setTimestampTrustAnchors([...TrustList.timestampTrustAnchors, otherLeafCert]);
-            const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
+            const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
             // check individual codes
             assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntries(label));
@@ -661,8 +659,8 @@ describe('Certificate Chain Validation', () => {
 
         it('should detect expired leaf certificate', async () => {
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
-                notAfter: new Date(Date.now() - 1000),
-            }); // expired 1 second ago
+                notAfter: new Date(Date.now() - 60000),
+            }); // expired 60 seconds ago
 
             // Create timestamp provider
             const otherTimestampProvider = new LocalTimestampProvider(
@@ -687,10 +685,28 @@ describe('Certificate Chain Validation', () => {
             assert.ok(!validationResult.isValid, 'Validation result should be invalid');
         });
 
+        it('should reject a claim when a trusted timestamp is outside the signing credential validity', async () => {
+            const [expiredLeafKeys, expiredLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
+                notAfter: new Date(Date.now() - 60000), // expired 60 seconds ago
+            });
+            const expiredSigner = new LocalSigner(
+                await toPkcs8Bytes(expiredLeafKeys.privateKey),
+                CoseAlgorithmIdentifier.ES256,
+                expiredLeafCert,
+                [intermediateCert],
+            );
+
+            // The default timestamp provider uses a separate, currently valid TSA certificate
+            const [validationResult, label] = await getValidationResult(expiredSigner, timestampProvider);
+
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesClaimSignatureOutsideValidity(label));
+            assert.ok(!validationResult.isValid, 'Validation result should be invalid');
+        });
+
         it('should detect not-yet-valid leaf certificate', async () => {
             const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
-                notBefore: tomorrow, // not valid yet
+                notBefore: new Date(Date.now() + 60000), // not valid yet
             });
 
             // Create timestamp provider
@@ -717,14 +733,12 @@ describe('Certificate Chain Validation', () => {
         });
 
         it('should detect expired intermediate certificate', async () => {
-            // TODO Not working for the TSA certificate
-
             // Create a new intermediate certificate that is expired
             const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
                 rootCert,
                 rootKeys,
                 {
-                    notAfter: new Date(Date.now() - 1000), // expired 1 second ago
+                    notAfter: new Date(Date.now() - 60000), // expired 60 seconds ago
                 },
             );
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
@@ -749,15 +763,44 @@ describe('Certificate Chain Validation', () => {
             assert.ok(!validationResult.isValid, 'Validation result should be invalid');
         });
 
-        it('should detect not-yet-valid intermediate certificate', async () => {
-            // TODO Not working for the TSA certificate
+        it('should detect but accept expired intermediate TSA certificate', async () => {
+            
+            // Create a new intermediate certificate that is expired
+            const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
+                rootCert,
+                rootKeys,
+                {
+                    notAfter: new Date(Date.now() - 60000), // expired 60 seconds ago
+                },
+            );
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
+                otherIntermediateCert,
+                otherIntermediateKeys,
+            );
 
+            // Create a signer
+            const othertimestampProvider = new LocalTimestampProvider(
+                otherLeafCert,
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                [otherIntermediateCert],
+            );
+
+            const [validationResult, label] = await getValidationResult(signer, othertimestampProvider);
+
+            // check individual codes
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrustedTimeStamp(label));
+
+            // // check overall validity
+            assert.ok(validationResult.isValid, 'Validation result should be valid');
+        });
+
+        it('should detect not-yet-valid intermediate certificate', async () => {
             // Create a new intermediate certificate that is not valid yet
             const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
                 rootCert,
                 rootKeys,
                 {
-                    notBefore: new Date(Date.now() + 1000), // not valid yet
+                    notBefore: new Date(Date.now() + 60000), // not valid yet
                 },
             );
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
@@ -782,12 +825,41 @@ describe('Certificate Chain Validation', () => {
             assert.ok(!validationResult.isValid, 'Validation result should be invalid');
         });
 
-        it('should detect expired root certificate', async () => {
-            // TODO Not working for the TSA certificate
+        it('should detect but accept not-yet-valid TSA intermediate certificate', async () => {
+            // Create a new intermediate certificate that is not valid yet
+            const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
+                rootCert,
+                rootKeys,
+                {
+                    notBefore: new Date(Date.now() + 60000), // not valid yet
+                },
+            );
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
+                otherIntermediateCert,
+                otherIntermediateKeys,
+            );
 
+            // Create a timestamp provider
+            const otherTimestampProvider = new LocalTimestampProvider(
+                otherLeafCert,
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                [otherIntermediateCert],
+            );
+
+            const [validationResult, label] = await getValidationResult(signer, otherTimestampProvider);
+
+            // check individual codes
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrustedTimeStamp(label));
+
+            // // check overall validity
+            assert.ok(validationResult.isValid, 'Validation result should be valid');
+        });
+
+
+        it('should detect expired root certificate', async () => {
             // Create a new root certificate that is expired
             const [otherRootKeys, otherRootCert] = await createRootCertificate({
-                notAfter: new Date(Date.now() - 1000), // expired 1 second ago
+                notAfter: new Date(Date.now() - 60000), // expired 60 second ago
             });
             const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
                 otherRootCert,
@@ -815,12 +887,41 @@ describe('Certificate Chain Validation', () => {
             assert.ok(!validationResult.isValid, 'Validation result should be invalid');
         });
 
-        it('should detect not-yet-valid root certificate', async () => {
-            // TODO Not working for the TSA certificate
+        it('should detect but accept expired root TSA certificate', async () => {
+            // Create a new root certificate that is expired
+            const [otherRootKeys, otherRootCert] = await createRootCertificate({
+                notAfter: new Date(Date.now() - 60000), // expired 60 second ago
+            }, undefined, false);
+            const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
+                otherRootCert,
+                otherRootKeys,
+            );
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
+                otherIntermediateCert,
+                otherIntermediateKeys,
+            );
 
+            // Create a timestamp provider
+            const otherTimestampProvider = new LocalTimestampProvider(
+                otherLeafCert,
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                [otherIntermediateCert],
+            );
+            TrustList.setTimestampTrustAnchors([otherRootCert]);
+
+            const [validationResult, label] = await getValidationResult(signer, otherTimestampProvider);
+
+            // check individual codes
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrustedTimeStamp(label));
+
+            // // check overall validity
+            assert.ok(validationResult.isValid, 'Validation result should be valid');
+        });
+
+        it('should detect not-yet-valid root certificate', async () => {
             // Create a new root certificate that is not valid yet
             const [otherRootKeys, otherRootCert] = await createRootCertificate({
-                notBefore: new Date(Date.now() + 1000), // not valid yet
+                notBefore: new Date(Date.now() + 60000), // not valid yet
             });
             const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
                 otherRootCert,
@@ -846,14 +947,45 @@ describe('Certificate Chain Validation', () => {
 
             // // check overall validity
             assert.ok(!validationResult.isValid, 'Validation result should be invalid');
+        });
+
+        it('should detect but accept not-yet-valid root TSA certificate', async () => {
+            // Create a new root certificate that is not valid yet
+            const [otherRootKeys, otherRootCert] = await createRootCertificate({
+                notBefore: new Date(Date.now() + 60000), // not valid yet
+            }, undefined, false);
+            const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
+                otherRootCert,
+                otherRootKeys,
+            );
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
+                otherIntermediateCert,
+                otherIntermediateKeys,
+            );
+
+            // Create a timestamp provider
+            const otherTimestampProvider = new LocalTimestampProvider(
+                otherLeafCert,
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                [otherIntermediateCert],
+            );
+            TrustList.setTimestampTrustAnchors([otherRootCert]);
+
+            const [validationResult, label] = await getValidationResult(signer, otherTimestampProvider);
+
+            // check individual codes
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrustedTimeStamp(label));
+
+            // // check overall validity
+            assert.ok(validationResult.isValid, 'Validation result should be valid');
         });
     });
 
     describe('4. Key Usage Extensions', () => {
-        it('certificates used to sign C2PA manifests shall assert the digitalSignature bit for the intermediate', async () => {
-            const [otherIntermediateKeys, otherIntermediateCert] = await createIntermediateCertificate(
-                rootCert,
-                rootKeys,
+        it('certificates used to sign C2PA manifests shall assert the digitalSignature bit', async () => {
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
+                intermediateCert,
+                intermediateKeys,
                 undefined,
                 {
                     [ExtensionClassNames.KeyUsagesExtension]: new KeyUsagesExtension(
@@ -862,23 +994,19 @@ describe('Certificate Chain Validation', () => {
                     ),
                 },
             );
-            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(
-                otherIntermediateCert,
-                otherIntermediateKeys,
-            );
 
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
                 CoseAlgorithmIdentifier.ES256,
                 otherLeafCert,
-                [otherIntermediateCert],
+                [intermediateCert],
             );
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
             // check individual codes
-            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrusted(label));
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesInvalid(label));
 
             // // check overall validity
             assert.ok(!validationResult.isValid, 'Validation result should be invalid');
@@ -947,6 +1075,90 @@ describe('Certificate Chain Validation', () => {
 
             // // check overall validity
             assert.ok(!validationResult.isValid, 'Validation result should be invalid');
+        });
+
+        it('should reject an end-entity certificate acting as intermediate CA', async () => {
+            // A non-CA certificate issued by the intermediate...
+            const [eeKeys, eeCert] = await createLeafCertificate(intermediateCert, intermediateKeys);
+            // ...must not be able to issue further certificates
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(eeCert, eeKeys, {
+                subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Leaf2',
+            });
+            const otherSigner = new LocalSigner(
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                CoseAlgorithmIdentifier.ES256,
+                otherLeafCert,
+                [eeCert, intermediateCert],
+            );
+
+            const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
+
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrusted(label));
+            assert.ok(!validationResult.isValid, 'Validation result should be invalid');
+        });
+
+        it('should reject certificates issued by an end-entity trust anchor', async () => {
+            const [eeKeys, eeCert] = await createLeafCertificate(intermediateCert, intermediateKeys);
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(eeCert, eeKeys, {
+                subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Leaf2',
+            });
+            const otherSigner = new LocalSigner(
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                CoseAlgorithmIdentifier.ES256,
+                otherLeafCert,
+            );
+
+            // Trusting an end-entity certificate does not make it a CA
+            TrustList.setTrustAnchors([eeCert]);
+
+            const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
+
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrusted(label));
+            assert.ok(!validationResult.isValid, 'Validation result should be invalid');
+        });
+
+        it('should reject an intermediate that exceeds the pathLenConstraint of its issuer', async () => {
+            // root → intermediate (pathLen 0) → intermediate 2 → leaf
+            const [int1Keys, int1Cert] = await createIntermediateCertificate(rootCert, rootKeys, undefined, {
+                [ExtensionClassNames.BasicConstraintsExtension]: new BasicConstraintsExtension(true, 0, true),
+            });
+            const [int2Keys, int2Cert] = await createIntermediateCertificate(int1Cert, int1Keys, {
+                subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Intermediate2',
+            });
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(int2Cert, int2Keys);
+            const otherSigner = new LocalSigner(
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                CoseAlgorithmIdentifier.ES256,
+                otherLeafCert,
+                [int2Cert, int1Cert],
+            );
+
+            const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
+
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntriesUntrusted(label));
+            assert.ok(!validationResult.isValid, 'Validation result should be invalid');
+        });
+
+        it('should accept an intermediate within the pathLenConstraint of its issuer', async () => {
+            // root → intermediate (pathLen 1) → intermediate 2 → leaf
+            const [int1Keys, int1Cert] = await createIntermediateCertificate(rootCert, rootKeys, undefined, {
+                [ExtensionClassNames.BasicConstraintsExtension]: new BasicConstraintsExtension(true, 1, true),
+            });
+            const [int2Keys, int2Cert] = await createIntermediateCertificate(int1Cert, int1Keys, {
+                subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Intermediate2',
+            });
+            const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(int2Cert, int2Keys);
+            const otherSigner = new LocalSigner(
+                await toPkcs8Bytes(otherLeafKeys.privateKey),
+                CoseAlgorithmIdentifier.ES256,
+                otherLeafCert,
+                [int2Cert, int1Cert],
+            );
+
+            const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
+
+            assert.deepEqual(validationResult.statusEntries, getExpectedValidationStatusEntries(label));
+            assert.ok(validationResult.isValid, 'Validation result should be valid');
         });
     });
 
