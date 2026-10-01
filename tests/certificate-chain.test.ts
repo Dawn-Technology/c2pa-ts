@@ -264,6 +264,7 @@ async function getLeafExtensions(subjectPublicKey: CryptoKey, issuerPublicKey: C
 async function createRootCertificate(
     partial?: Partial<X509CertificateCreateSelfSignedParams>,
     extensionChanges?: ExtensionChangeMap,
+    setAsTrustAnchor = true,
 ): Promise<[CryptoKeyPair, X509Certificate]> {
     const rootKeys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
     const extensions = await getRootExtensions(rootKeys.publicKey);
@@ -278,7 +279,9 @@ async function createRootCertificate(
         },
         crypto,
     );
-    TrustList.setTrustAnchors([rootCert]);
+    if (setAsTrustAnchor) {
+        TrustList.setTrustAnchors([rootCert]);
+    }
 
     return [rootKeys, rootCert];
 }
