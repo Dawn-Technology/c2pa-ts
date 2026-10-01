@@ -338,7 +338,7 @@ export class Signature {
                     result.addInformational(
                         trust,
                         sourceBox,
-                        'The signed time-stamp attribute in the signature was created outside the validity period of the TSA\'s certificate.',
+                        "The signed time-stamp attribute in the signature was created outside the validity period of the TSA's certificate.",
                     );
                     continue;
                 }
@@ -347,9 +347,7 @@ export class Signature {
                     continue;
                 }
 
-                if (
-                    !(await this.validateTimestampSignerTrust(signedData, tstInfo.genTime, timestampTrustAnchors))
-                ) {
+                if (!(await this.validateTimestampSignerTrust(signedData, tstInfo.genTime, timestampTrustAnchors))) {
                     result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
                 }
 
@@ -456,7 +454,11 @@ export class Signature {
         signedData: pkijs.SignedData,
         timestamp: Date,
         timestampTrustAnchors: X509Certificate[],
-    ): Promise<ValidationStatusCode.TimeStampOutsideValidity | ValidationStatusCode.TimeStampUntrusted | ValidationStatusCode.TimeStampTrusted> {
+    ): Promise<
+        | ValidationStatusCode.TimeStampOutsideValidity
+        | ValidationStatusCode.TimeStampUntrusted
+        | ValidationStatusCode.TimeStampTrusted
+    > {
         const signerCertificate = Signature.getSignedDataSignerCertificate(signedData);
         if (!signerCertificate) {
             return ValidationStatusCode.TimeStampUntrusted;
@@ -486,7 +488,9 @@ export class Signature {
             timestampTrustAnchors,
         );
 
-        return chainValidation === ValidationStatusCode.SigningCredentialTrusted ? ValidationStatusCode.TimeStampTrusted : ValidationStatusCode.TimeStampUntrusted;
+        return chainValidation === ValidationStatusCode.SigningCredentialTrusted ?
+                ValidationStatusCode.TimeStampTrusted
+            :   ValidationStatusCode.TimeStampUntrusted;
     }
 
     private getTimestampWithoutVerification(): Date | undefined {
@@ -647,7 +651,6 @@ export class Signature {
         }
 
         // Check timestamp
-        // console.log('validityTimestamp', validityTimestamp, 'notBefore', certificate.notBefore, 'notAfter', certificate.notAfter);
         if (certificate.notBefore >= validityTimestamp || certificate.notAfter <= validityTimestamp)
             return ValidationStatusCode.SigningCredentialExpired;
 
@@ -834,7 +837,6 @@ export class Signature {
             });
 
             if (!issuer) {
-                // await this.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
 
@@ -845,7 +847,6 @@ export class Signature {
 
             // Loop detection
             if (seen.has(issuer)) {
-                // await this.printPublicKey(current);
                 return ValidationStatusCode.SigningCredentialUntrusted;
             }
             seen.add(issuer);
@@ -887,23 +888,5 @@ export class Signature {
         }
 
         return true;
-    }
-
-    private static async printPublicKey(certificate: X509Certificate) {
-        try {
-            // const boe = certificate.publicKey as unknown as CryptoKey;
-            // const spki = await crypto.subtle.exportKey('spki', boe);
-            const spki = certificate.rawData;
-            // 2. Converteer naar base64
-            // const base64Cert = Buffer.from(spki).toString('base64');
-            const base64Cert = bytesToBase64(new Uint8Array(spki));
-            // 3. Voeg line breaks elke 64 tekens (PEM standaard)
-            const pem = base64Cert.match(/.{1,64}/g)?.join('\n');
-            // 4. Voeg de PEM headers toe
-            const pemString = `-----BEGIN PUBLIC KEY-----\n${pem}\n-----END PUBLIC KEY-----`;
-            console.debug(pemString);
-        } catch (e) {
-            console.debug('Failed to print public key for debugging:', e);
-        }
     }
 }

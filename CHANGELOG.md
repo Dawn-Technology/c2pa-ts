@@ -1,11 +1,5 @@
 # c2pa-ts
 
-## 0.15.0
-
-### Minor Changes
-
-- Add CAWG support
-
 ## 0.14.0
 
 ### Minor Changes

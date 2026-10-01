@@ -14,11 +14,6 @@ export * from './types';
 // Utility functions
 export * from './utils';
 
-// Validator functions
-export * from './cawg-validator';
-export * from './identity-assertion-validator';
-export * from './identity-claims-aggregation-validator';
-
 // Did resolver
 export { didResolver } from './did-resolver';
 
