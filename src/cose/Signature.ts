@@ -12,7 +12,6 @@ import {
 } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
-import { bytesToBase64, type CawgValidationOptions } from '../cawg';
 import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
@@ -263,7 +262,7 @@ export class Signature {
         v1Payload: Uint8Array,
         v2Payload: Uint8Array,
         sourceBox?: JUMBF.IBox,
-        validationOptions?: CawgValidationOptions,
+        validationOptions?: ValidationOptions,
     ): Promise<ValidationResult> {
         this.validatedTimestamp = undefined;
 
@@ -338,17 +337,13 @@ export class Signature {
                     result.addInformational(
                         trust,
                         sourceBox,
-                        "The signed time-stamp attribute in the signature was created outside the validity period of the TSA's certificate.",
+                        'The signed time-stamp attribute in the signature was created outside the validity period of the TSA\'s certificate.',
                     );
                     continue;
                 }
                 if (trust === ValidationStatusCode.TimeStampUntrusted) {
                     result.addInformational(trust, sourceBox);
                     continue;
-                }
-
-                if (!(await this.validateTimestampSignerTrust(signedData, tstInfo.genTime, timestampTrustAnchors))) {
-                    result.addError(ValidationStatusCode.TimeStampUntrusted, sourceBox);
                 }
 
                 this.validatedTimestamp = tstInfo.genTime;
@@ -566,7 +561,7 @@ export class Signature {
     public async validate(
         payload: Uint8Array,
         sourceBox?: JUMBF.IBox,
-        validationOptions?: CawgValidationOptions,
+        validationOptions?: ValidationOptions,
     ): Promise<ValidationResult> {
         if (!this.certificate || !this.rawProtectedBucket || !this.signature || !this.algorithm) {
             return ValidationResult.error(ValidationStatusCode.SigningCredentialInvalid, sourceBox);

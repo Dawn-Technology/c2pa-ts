@@ -14,9 +14,6 @@ export * from './types';
 // Utility functions
 export * from './utils';
 
-// Did resolver
-export { didResolver } from './did-resolver';
-
 // Identity Claims Aggregation support
 export * from './identity-claims-aggregation';
 

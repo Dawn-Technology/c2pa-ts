@@ -1,6 +1,5 @@
 import { Asset } from '../asset';
-import { type CawgValidationOptions } from '../cawg';
-import { Signer } from '../cose';
+import { Signer, ValidationOptions } from '../cose';
 import { HashAlgorithm } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { BinaryHelper } from '../util';
@@ -132,9 +131,9 @@ export class ManifestStore {
      * Validates the active manifest
      * @param asset Asset for validation of bindings
      * // TODO: Consider moving the options to a service instead of passing through the manifest store and manifest layers
-     * @param validationOptions Validation options for C2PA and CAWG
+     * @param validationOptions Validation options for C2PA
      */
-    public async validate(asset: Asset, validationOptions?: CawgValidationOptions): Promise<ValidationResult> {
+    public async validate(asset: Asset, validationOptions?: ValidationOptions): Promise<ValidationResult> {
         const activeManifest = this.getActiveManifest();
         if (activeManifest) {
             return activeManifest.validate(asset, validationOptions);
