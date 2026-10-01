@@ -1,6 +1,11 @@
 import * as fs from 'node:fs/promises';
-import { LocalIdentitySigner } from '../../src/cawg';
-import { NamedActorRole, SignatureType, VerifiedIdentity, VerifiedIdentityType } from '../../src/cawg';
+import {
+    LocalIdentitySigner,
+    NamedActorRole,
+    SignatureType,
+    VerifiedIdentity,
+    VerifiedIdentityType,
+} from '../../src/cawg';
 import { CoseAlgorithmIdentifier } from '../../src/cose';
 
 export interface TestIdentity {

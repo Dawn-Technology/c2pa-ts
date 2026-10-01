@@ -6,8 +6,8 @@
   "license": "Apache-2.0",
   "description": "Pure TypeScript implementation of C2PA manifest reading, validation, and creation",
   "repository": {
-      "type": "git",
-      "url": "git+https://github.com/TrustNXT/c2pa-ts.git"
+    "type": "git",
+    "url": "git+https://github.com/TrustNXT/c2pa-ts.git"
   },
   "main": "./dist/index.js",
   "module": "./dist/index.js",

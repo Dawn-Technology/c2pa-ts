@@ -42,11 +42,11 @@ import {
     X509CertificateCreateSelfSignedParams,
     X509CertificateGenerator,
 } from '@peculiar/x509';
-import { beforeAll, beforeEach, describe, expect, it } from 'bun:test';
+import { beforeEach, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
 import { CoseAlgorithmIdentifier, LocalSigner, TrustList } from '../src/cose';
 import { SuperBox } from '../src/jumbf';
-import { DataHashAssertion, ManifestStore, ValidationResult, ValidationStatusCode } from '../src/manifest';
+import { DataHashAssertion, ManifestStore, ValidationResult } from '../src/manifest';
 import { LocalTimestampProvider } from '../src/rfc3161';
 import {
     getExpectedValidationStatusEntries,
@@ -264,7 +264,6 @@ async function getLeafExtensions(subjectPublicKey: CryptoKey, issuerPublicKey: C
 async function createRootCertificate(
     partial?: Partial<X509CertificateCreateSelfSignedParams>,
     extensionChanges?: ExtensionChangeMap,
-    setAsTrustAnchor: boolean = true,
 ): Promise<[CryptoKeyPair, X509Certificate]> {
     const rootKeys = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
     const extensions = await getRootExtensions(rootKeys.publicKey);
@@ -279,9 +278,7 @@ async function createRootCertificate(
         },
         crypto,
     );
-    if (setAsTrustAnchor) {
-        TrustList.setTrustAnchors([rootCert]);
-    }
+    TrustList.setTrustAnchors([rootCert]);
 
     return [rootKeys, rootCert];
 }
@@ -634,12 +631,6 @@ describe('Certificate Chain Validation', () => {
                 { notBefore: new Date() },
             );
 
-            // Create timestamp provider
-            const otherTimestampProvider = new LocalTimestampProvider(
-                otherLeafCert,
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                [otherIntermediateCert],
-            );
             // Create a signer
             const otherSigner = new LocalSigner(
                 await toPkcs8Bytes(otherLeafKeys.privateKey),
@@ -707,7 +698,6 @@ describe('Certificate Chain Validation', () => {
         });
 
         it('should detect not-yet-valid leaf certificate', async () => {
-            const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
                 notBefore: new Date(Date.now() + 60000), // not valid yet
             });

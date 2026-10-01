@@ -337,7 +337,7 @@ export class Signature {
                     result.addInformational(
                         trust,
                         sourceBox,
-                        'The signed time-stamp attribute in the signature was created outside the validity period of the TSA\'s certificate.',
+                        "The signed time-stamp attribute in the signature was created outside the validity period of the TSA's certificate.",
                     );
                     continue;
                 }

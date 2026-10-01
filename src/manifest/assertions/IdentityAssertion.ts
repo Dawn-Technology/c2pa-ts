@@ -1,22 +1,15 @@
 import 'core-js/full/reflect';
 import { Asset } from '../../asset';
-import {
-    IdentityClaimsAggregation,
-    IdentitySigner,
-    isEmptyOrMissing,
-    NamedActorRole,
-    SignatureType,
-} from '../../cawg';
+import { IdentityClaimsAggregation, IdentitySigner, isEmptyOrMissing, NamedActorRole, SignatureType } from '../../cawg';
 import { Signer } from '../../cose';
 import * as JUMBF from '../../jumbf';
-import { LocalTimestampProvider } from '../../rfc3161';
+import { TimestampProvider } from '../../rfc3161';
 import { BinaryHelper } from '../../util';
 import { Claim } from '../Claim';
 import { Manifest } from '../Manifest';
 import * as raw from '../rawTypes';
 import { ValidationStatusCode } from '../types';
 import { ValidationError } from '../ValidationError';
-import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
 import { AssertionLabels } from './AssertionLabels';
 import { DataHashAssertion } from './DataHashAssertion';
@@ -226,21 +219,21 @@ export class IdentityAssertion extends Assertion {
         manifest: Manifest,
         asset: Asset,
         signer: Signer,
-        timestampProvider: LocalTimestampProvider,
+        timestampProvider: TimestampProvider,
         identitySigners: IdentitySigner,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion }>;
     public static async create(
         manifest: Manifest,
         asset: Asset,
         signer: Signer,
-        timestampProvider: LocalTimestampProvider,
+        timestampProvider: TimestampProvider,
         identitySigners: IdentitySigner[],
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion[] }>;
     public static async create(
         manifest: Manifest,
         asset: Asset,
         signer: Signer,
-        timestampProvider: LocalTimestampProvider,
+        timestampProvider: TimestampProvider,
         identitySigners: IdentitySigner | IdentitySigner[],
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion | IdentityAssertion[] }> {
         // Create a data hash assertion (hard binding)

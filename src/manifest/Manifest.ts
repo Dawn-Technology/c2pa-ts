@@ -5,7 +5,7 @@ import { Crypto } from '../crypto/Crypto';
 import * as JUMBF from '../jumbf';
 import { TimestampProvider } from '../rfc3161';
 import { BinaryHelper, MalformedContentError } from '../util';
-import { ActionAssertion, Assertion, AssertionLabels, IdentityAssertion, IngredientAssertion } from './assertions';
+import { ActionAssertion, Assertion, AssertionLabels, IngredientAssertion } from './assertions';
 import { AssertionStore } from './AssertionStore';
 import { Claim } from './Claim';
 import { ManifestStore } from './ManifestStore';
