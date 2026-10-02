@@ -6,15 +6,16 @@
  */
 
 import * as JUMBF from '../jumbf';
-import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
-import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
 import {
-    SignatureType,
-    type ExpectedCountersignerMap,
-    type HashedUriMap,
-    type HashMap,
-    type SignerPayloadMap,
-} from './types.js';
+    Assertion,
+    CawgTrustConfiguration,
+    Claim,
+    Manifest,
+    ValidationResult,
+    ValidationStatusCode,
+} from '../manifest';
+import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
+import { ExpectedCountersignerMap, HashedUriMap, HashMap, SignatureType, SignerPayloadMap } from './types';
 import {
     arrayEquals,
     computeHash,
@@ -26,7 +27,7 @@ import {
     isHardBindingAssertion,
     serializeClaimData,
     validatePadding,
-} from './utils.js';
+} from './utils';
 
 export class IdentityAssertionValidator {
     /** The C2PA manifest that contains the assertion being validated */
@@ -282,8 +283,7 @@ export class IdentityAssertionValidator {
 
             // Replace expected countersigners' hashes with zeros
             if (payload.expected_countersigners) {
-                // Implementation depends on matching credentials
-                // Simplified for now
+                // TODO Implementation depends on matching credentials
             }
 
             // Serialize and hash
@@ -419,8 +419,7 @@ export class IdentityAssertionValidator {
      */
     async validateCountersignerCredentials(assertion: Assertion, expectedCredentials: HashMap): Promise<boolean> {
         // TODO Extract and hash credentials from assertion
-        // Implementation depends on credential type
-        return true; // Simplified
+        return true;
     }
 
     /**

@@ -7,14 +7,11 @@
 import * as cborX from 'cbor-x';
 import { Crypto, HashAlgorithm } from '../crypto';
 import { Claim } from '../manifest/Claim';
-import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from './types.js';
 import { BinaryHelper } from '../util';
+import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from './types.js';
 
 /**
  * Serialize claim data using CBOR deterministic encoding
- *
- * @param payload - The claim data to serialize
- * @returns CBOR-encoded claim bytes
  */
 export function serializeClaimData(payload: Claim): Uint8Array {
     // Use deterministic encoding for consistent results
@@ -23,22 +20,13 @@ export function serializeClaimData(payload: Claim): Uint8Array {
 
 /**
  * Validate that padding contains only zero (0x00) bytes
- *
- * @param pad - The padding bytes to validate
- * @returns True if all bytes are 0x00, false otherwise
  */
 export function validatePadding(pad: Uint8Array): boolean {
     return pad.every(byte => byte === 0x00);
 }
 
 /**
- * Convert byte array to base64 string
- *
- * Uses Node.js Buffer if available, otherwise falls back to btoa().
- *
- * @param bytes - The bytes to encode
- * @returns Base64-encoded string
- * @throws Error if no base64 encoder is available in this runtime
+ * Convert CBOR byte strings to base64 for JSON representation
  */
 export function bytesToBase64(bytes: Uint8Array): string {
     const bufferCtor = (globalThis as { Buffer?: typeof Buffer }).Buffer;
@@ -57,13 +45,6 @@ export function bytesToBase64(bytes: Uint8Array): string {
 
 /**
  * Convert base64 string to byte array
- *
- * Handles Node.js Buffer or browser atob APIs depending on runtime environment.
- * Accepts strings, Uint8Array, or number arrays.
- *
- * @param base64 - Base64-encoded string, bytes, or number array
- * @returns Decoded byte array
- * @throws Error if no base64 decoder is available in this runtime
  */
 export function base64ToBytes(base64: string | Uint8Array | number[]): Uint8Array {
     // If input is already a number array, convert directly to Uint8Array
@@ -95,26 +76,10 @@ export function base64ToBytes(base64: string | Uint8Array | number[]): Uint8Arra
 
 /**
  * Convert byte array to base64url string
- *
- * Uses RFC 4648 base64url encoding (URL-safe variant without padding).
- *
- * @param bytes - The bytes to encode
- * @returns Base64url-encoded string (without padding)
  */
 export function bytesToBase64Url(bytes: Uint8Array): string {
     return bytesToBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
-
-/**
- * Convert signer_payload to C2PA asset binding format for verifiable credentials
- *
- * Transforms the CBOR binary signer_payload into JSON-friendly format by
- * converting byte hashes to base64 strings for use in ICA credentials.
- *
- * @param payload - The signer payload to convert
- * @returns C2PA asset binding in JSON-compatible format
-import { BinaryHelper } from '../util';
-import type { C2paAssetBinding, SignerPayloadMap } from './types.js';
 
 /**
  * Convert signer_payload to C2PA asset binding format for verifiable credentials
@@ -349,16 +314,12 @@ export function isEmptyOrMissing(data: Uint8Array | null | undefined): boolean {
 }
 
 /**
-<<<<<<< HEAD
  * Convert a private JWK to a public JWK
  *
  * Removes private key parameters from a JSON Web Key, leaving only the public key information.
  *
  * @param privateJwk - Private JWK containing private parameters
  * @returns Public JWK with only public parameters
-=======
- * Convert a private JWK to a public JWK by removing private key parameters
->>>>>>> feature/cawg-signing-pr
  */
 export function privateJwkToPublicJwk({ kty, crv, x, y, n, e }: JsonWebKey): JsonWebKey {
     return { ...{ kty, crv, x, y, n, e } };

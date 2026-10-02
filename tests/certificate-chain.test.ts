@@ -44,7 +44,7 @@ import {
 } from '@peculiar/x509';
 import { beforeEach, describe, it } from 'bun:test';
 import { JPEG } from '../src/asset';
-import { CoseAlgorithmIdentifier, LocalSigner, TrustList } from '../src/cose';
+import { LocalSigner, TrustList } from '../src/cose';
 import { SuperBox } from '../src/jumbf';
 import { DataHashAssertion, ManifestStore, ValidationResult } from '../src/manifest';
 import { LocalTimestampProvider } from '../src/rfc3161';
@@ -672,7 +672,6 @@ describe('Certificate Chain Validation', () => {
         });
 
         it('should detect not-yet-valid leaf certificate', async () => {
-            const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
                 notBefore: new Date(Date.now() + 60000), // not valid yet
             });

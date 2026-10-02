@@ -1,11 +1,6 @@
 import * as fs from 'node:fs/promises';
-import {
-    LocalIdentitySigner,
-    NamedActorRole,
-    SignatureType,
-    VerifiedIdentity,
-    VerifiedIdentityType,
-} from '../../src/cawg';
+import { LocalIdentitySigner } from '../../src/cawg';
+import { NamedActorRole, SignatureType, VerifiedIdentity, VerifiedIdentityType } from '../../src/cawg/types';
 import { CoseAlgorithmIdentifier } from '../../src/cose';
 import { ValidationStatusCode } from '../../src/manifest';
 

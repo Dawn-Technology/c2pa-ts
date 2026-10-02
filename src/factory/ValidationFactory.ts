@@ -1,8 +1,14 @@
 import { Asset, createAsset } from '../asset';
-import { CawgValidationOptions } from '../cawg';
 import { Signature } from '../cose';
 import { SuperBox } from '../jumbf';
-import { Manifest, ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../manifest';
+import {
+    CawgValidationOptions,
+    Manifest,
+    ManifestStore,
+    ValidationError,
+    ValidationResult,
+    ValidationStatusCode,
+} from '../manifest';
 
 export type VerifiedManifestStore = ManifestStore & {
     manifests: VerifiedManifest[];

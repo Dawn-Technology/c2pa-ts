@@ -572,7 +572,7 @@ describe('Identity Assertion expected_claim_generator Validation', function () {
 
     it('reports IdentityExpectedClaimGeneratorMismatch for wrong hash', async function () {
         const buf = await fs.readFile(targetFileWrong).catch(() => undefined);
-        if (!buf) return;
+        if (!buf) assert.fail('Failed to read target file for wrong hash');
 
         const asset = await JPEG.create(buf);
         const jumbf = await asset.getManifestJUMBF();

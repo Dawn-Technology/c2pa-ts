@@ -17,10 +17,10 @@ import { Manifest } from '../Manifest';
 import * as raw from '../rawTypes';
 import { ValidationStatusCode } from '../types';
 import { ValidationError } from '../ValidationError';
+import { CawgTrustConfiguration } from '../ValidationOptions';
 import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
 import { AssertionLabels } from './AssertionLabels';
-import { CawgTrustConfiguration } from '../ValidationOptions';
 
 /**
  * CAWG Identity Assertion
@@ -117,7 +117,7 @@ export class IdentityAssertion extends Assertion {
 
     public override async validate(
         manifest: Manifest,
-        validationOptions?: CawgTrustConfiguration,
+        cawgTrustConfiguration?: CawgTrustConfiguration,
     ): Promise<ValidationResult> {
         const result = await super.validate(manifest);
 
@@ -128,7 +128,7 @@ export class IdentityAssertion extends Assertion {
                 'Identity assertion is missing source box reference',
             );
         }
-        const cawgValidator = new CawgValidator(manifest, this, this.label, this.sourceBox, validationOptions);
+        const cawgValidator = new CawgValidator(manifest, this, this.label, this.sourceBox, cawgTrustConfiguration);
         result.merge(await cawgValidator.validate());
 
         return result;

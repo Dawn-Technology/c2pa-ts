@@ -12,6 +12,7 @@ import { IdentityAssertion, Manifest, ValidationResult } from '../manifest';
 import { CawgTrustConfiguration } from '../manifest/ValidationOptions';
 import { IdentityAssertionValidator } from './identity-assertion-validator';
 import { IdentityClaimsAggregationValidator } from './identity-claims-aggregation-validator';
+import { SignatureType } from './types';
 
 /**
  * Validates CAWG identity assertions and identity claims aggregation credentials
@@ -68,7 +69,9 @@ export class CawgValidator {
      */
     async validate(): Promise<ValidationResult> {
         this.result.merge(await this.validateIdentityAssertion());
-        this.result.merge(await this.validateIdentityClaimsAggregation());
+        if (this.assertion.signerPayload.sig_type === SignatureType.IdentityClaimsAggregation) {
+            this.result.merge(await this.validateIdentityClaimsAggregation());
+        }
 
         return this.result;
     }

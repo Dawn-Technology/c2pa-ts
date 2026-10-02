@@ -3,7 +3,13 @@ import * as fs from 'node:fs/promises';
 import { beforeAll, describe, it } from 'bun:test';
 import { Asset, AssetType, JPEG } from '../../src/asset';
 import { SuperBox } from '../../src/jumbf';
-import { CawgValidationOptions, ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
+import {
+    CawgValidationOptions,
+    ManifestStore,
+    ValidationError,
+    ValidationResult,
+    ValidationStatusCode,
+} from '../../src/manifest';
 import { BinaryHelper } from '../../src/util';
 import { setTimestampTrustList, setTrustList } from '../utils/set-trust-list';
 
@@ -217,21 +223,13 @@ const testIdentityFiles: Record<string, TestIdentityExpectations> = {
         assetType: JPEG,
         jumbf: true,
         valid: false,
-        statusCodes: [
-            ValidationStatusCode.IdentityPadInvalid,
-            ValidationStatusCode.IcaInvalidContentType,
-            ValidationStatusCode.IcaInvalidContentType,
-        ],
+        statusCodes: [ValidationStatusCode.IdentityPadInvalid],
     },
     'pad2_invalid.jpg': {
         assetType: JPEG,
         jumbf: true,
         valid: false,
-        statusCodes: [
-            ValidationStatusCode.IdentityPadInvalid,
-            ValidationStatusCode.IcaInvalidContentType,
-            ValidationStatusCode.IcaInvalidContentType,
-        ],
+        statusCodes: [ValidationStatusCode.IdentityPadInvalid],
     },
 };
 

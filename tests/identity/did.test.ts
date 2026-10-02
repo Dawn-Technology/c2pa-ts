@@ -300,7 +300,10 @@ describe('DID resolver (no mock)', () => {
             const fixture = await createResolverFixture(method);
             const result = await didResolver.resolve(fixture.did);
 
-            assert.ok(!result.didResolutionMetadata.error, result.didResolutionMetadata.error);
+            assert.ok(
+                !result.didResolutionMetadata.error,
+                result.didResolutionMetadata.error ?? 'Unknown DID resolution error',
+            );
             assert.ok(result.didDocument, 'expected DID document from resolver');
             assert.equal(result.didDocument?.id, fixture.did);
 

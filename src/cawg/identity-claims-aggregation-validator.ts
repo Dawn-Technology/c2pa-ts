@@ -19,11 +19,10 @@ import type {
     SigningAlgorithm,
 } from '../crypto/types';
 import * as JUMBF from '../jumbf';
-import { ValidationResult, ValidationStatusCode } from '../manifest';
+import { CawgTrustConfiguration, ValidationResult, ValidationStatusCode } from '../manifest';
 import { BinaryHelper } from '../util';
 import { didResolver } from './did-resolver';
 import {
-    CawgTrustConfiguration,
     SUPPORTED_COSE_ALGORITHMS,
     SUPPORTED_DID_METHODS,
     SUPPORTED_VERIFICATION_METHODS,
@@ -37,7 +36,7 @@ import {
     type SignerPayloadMap,
     type VerifiedIdentity,
 } from './types.js';
-import { c2paAssetBindingToSignerPayload } from './utils.js';
+import { c2paAssetBindingToSignerPayload } from './utils';
 
 export class IdentityClaimsAggregationValidator {
     /** COSE signature bytes from the identity assertion */
@@ -136,7 +135,7 @@ export class IdentityClaimsAggregationValidator {
             // Step 4: Validate credential structure
             this.validateIcaCredentialStructure(credential);
 
-            // Step 5: Obtain issuer's public key via DID resolution
+            // Step 5: Verify issuer
             const issuerDid = this.getIssuerDid(credential);
             if (issuerDid?.split(':')[0] !== 'did') {
                 this.result.addError(
@@ -148,14 +147,24 @@ export class IdentityClaimsAggregationValidator {
             }
 
             const didMethod = issuerDid.split(':')[1];
+            const issuerTrusted = await this.verifyIssuerTrust(issuerDid);
+            if (!issuerTrusted) {
+                this.result.addError(
+                    ValidationStatusCode.IcaUntrustedIssuer,
+                    this.assertionLabel,
+                    'Issuer DID is not in trusted list',
+                );
+            }
             if (!(SUPPORTED_DID_METHODS as readonly string[]).includes(`did:${didMethod}`)) {
                 this.result.addError(
                     ValidationStatusCode.IcaDidUnsupportedMethod,
                     this.assertionLabel,
                     `DID method not supported: did:${didMethod}`,
                 );
+                return this.result;
             }
 
+            // Step 6: Obtain issuer's public key via DID resolution
             const didDocument = await this.resolveDid(issuerDid);
             if (!didDocument) {
                 this.result.addError(
@@ -175,17 +184,6 @@ export class IdentityClaimsAggregationValidator {
                     'Failed to extract public key from DID document',
                 );
                 return this.result;
-            }
-
-            // Step 6: Verify issuer is trusted
-            const issuerTrusted = await this.verifyIssuerTrust(issuerDid);
-
-            if (!issuerTrusted) {
-                this.result.addError(
-                    ValidationStatusCode.IcaUntrustedIssuer,
-                    this.assertionLabel,
-                    'Issuer DID is not in trusted list',
-                );
             }
 
             // Step 7: Verify COSE signature
@@ -227,7 +225,7 @@ export class IdentityClaimsAggregationValidator {
             this.validateCredentialValidityDates(credential);
 
             // Step 10: Check revocation status
-            if (this.validationOptions?.checkRevocation && credential.credentialStatus) {
+            if (credential.credentialStatus) {
                 await this.validateRevocationStatus(credential);
             }
 
@@ -493,7 +491,7 @@ export class IdentityClaimsAggregationValidator {
             for (const cert of signedData.certificates ?? []) {
                 if (!(cert instanceof pkijs.Certificate)) continue;
                 const x509Cert = new X509Certificate(cert.toSchema().toBER());
-                const certValidation = await Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
+                const certValidation = Signature.validateCertificate(x509Cert, tstInfo.genTime, false);
                 if (certValidation !== ValidationStatusCode.SigningCredentialTrusted) {
                     return false;
                 }

@@ -23,7 +23,7 @@ import {
     ValidationStatusCode,
 } from './types';
 import { ValidationError } from './ValidationError';
-import { CawgTrustConfiguration, CawgValidationOptions } from './ValidationOptions';
+import { CawgValidationOptions } from './ValidationOptions';
 import { ValidationResult } from './ValidationResult';
 
 export class Manifest implements ManifestComponent {
@@ -310,7 +310,7 @@ export class Manifest implements ManifestComponent {
         }
 
         // Validate identity assertions
-        result.merge(await this.validateIdentityAssertions(validationOptions?.cawg));
+        result.merge(await this.validateIdentityAssertions(validationOptions));
 
         // Only process asset data if everything has been validated so far
         if (!result.isValid) return result;
@@ -623,15 +623,13 @@ export class Manifest implements ManifestComponent {
      * @param validationOptions - Validation options
      * @returns ValidationResult containing any validation errors or successes
      */
-    private async validateIdentityAssertions(
-        validationOptions: CawgTrustConfiguration = {},
-    ): Promise<ValidationResult> {
+    private async validateIdentityAssertions(validationOptions?: CawgValidationOptions): Promise<ValidationResult> {
         const result = new ValidationResult();
 
         // Check for identity  assertions
         const identityAssertions: IdentityAssertion[] = this.assertions?.getIdentityAssertions() ?? [];
         for (const assertion of identityAssertions) {
-            result.merge(await assertion.validate(this, validationOptions));
+            result.merge(await assertion.validate(this, validationOptions?.cawg));
         }
         return result;
     }
