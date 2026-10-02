@@ -150,11 +150,47 @@ export function getExpectedValidationStatusEntriesUntrusted(manifestLabel: strin
     ];
 }
 
+export function getExpectedValidationStatusEntriesUntrustedTimeStamp(manifestLabel: string | undefined) {
+    return [
+        {
+            code: ValidationStatusCode.TimeStampUntrusted,
+            explanation: undefined,
+            url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
+            success: true,
+        },
+        {
+            code: ValidationStatusCode.SigningCredentialTrusted,
+            explanation: undefined,
+            url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
+            success: true,
+        },
+        {
+            code: ValidationStatusCode.ClaimSignatureValidated,
+            explanation: undefined,
+            url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
+            success: true,
+        },
+        {
+            code: ValidationStatusCode.AssertionHashedURIMatch,
+            explanation: undefined,
+            url: 'self#jumbf=c2pa.assertions/c2pa.hash.data',
+            success: true,
+        },
+        {
+            code: ValidationStatusCode.AssertionDataHashMatch,
+            explanation: undefined,
+            url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.assertions/c2pa.hash.data`,
+            success: true,
+        },
+    ];
+}
+
 export function getExpectedValidationStatusEntriesWrongTimeStamp(manifestLabel: string | undefined) {
     return [
         {
             code: ValidationStatusCode.TimeStampOutsideValidity,
-            explanation: 'Timestamp outside signer certificate validity period',
+            explanation:
+                "The signed time-stamp attribute in the signature was created outside the validity period of the TSA's certificate.",
             url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
             success: true,
         },
@@ -169,6 +205,30 @@ export function getExpectedValidationStatusEntriesWrongTimeStamp(manifestLabel: 
             explanation: undefined,
             url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
             success: true,
+        },
+        {
+            code: ValidationStatusCode.AssertionHashedURIMatch,
+            explanation: undefined,
+            url: 'self#jumbf=c2pa.assertions/c2pa.hash.data',
+            success: true,
+        },
+    ];
+}
+
+export function getExpectedValidationStatusEntriesClaimSignatureOutsideValidity(manifestLabel: string | undefined) {
+    return [
+        {
+            code: ValidationStatusCode.TimeStampTrusted,
+            explanation: undefined,
+            url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
+            success: true,
+        },
+        {
+            code: ValidationStatusCode.ClaimSignatureOutsideValidity,
+            explanation:
+                'The claim signature referenced in the claim was created outside the validity period of the signing credential.',
+            url: `self#jumbf=/c2pa/${manifestLabel}/c2pa.signature`,
+            success: false,
         },
         {
             code: ValidationStatusCode.AssertionHashedURIMatch,
