@@ -939,8 +939,7 @@ export class IdentityClaimsAggregationValidator {
 
             // Decode protected header
             const protectedHeader = JUMBF.CBORBox.decoder.decode(protectedHeaderBytes) as
-                | ProtectedHeaderMap
-                | Map<number | string, unknown>;
+                ProtectedHeaderMap | Map<number | string, unknown>;
 
             const getProtectedHeaderParam = (label: number): unknown => {
                 if (protectedHeader instanceof Map) {

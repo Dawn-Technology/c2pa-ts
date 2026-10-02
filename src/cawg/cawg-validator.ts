@@ -9,9 +9,9 @@
  */
 import * as JUMBF from '../jumbf';
 import { IdentityAssertion, Manifest, ValidationResult } from '../manifest';
+import { CawgTrustConfiguration } from '../manifest/ValidationOptions';
 import { IdentityAssertionValidator } from './identity-assertion-validator';
 import { IdentityClaimsAggregationValidator } from './identity-claims-aggregation-validator';
-import { CawgTrustConfiguration } from './types';
 
 /**
  * Validates CAWG identity assertions and identity claims aggregation credentials

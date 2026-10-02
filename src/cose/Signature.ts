@@ -12,7 +12,6 @@ import {
 } from '@peculiar/x509';
 import * as asn1js from 'asn1js';
 import * as pkijs from 'pkijs';
-import { type CawgValidationOptions } from '../cawg';
 import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
@@ -32,6 +31,7 @@ import {
     TstContainer,
     UnprotectedBucket,
 } from './types';
+import { CawgValidationOptions } from '../manifest/ValidationOptions';
 
 /**
  * Options for signature validation.

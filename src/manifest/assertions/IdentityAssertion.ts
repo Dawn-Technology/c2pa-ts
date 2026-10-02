@@ -1,6 +1,5 @@
 import 'core-js/full/reflect';
 import {
-    CawgTrustConfiguration,
     CawgValidator,
     ExpectedCountersignerMap,
     HashedUriMap,
@@ -21,6 +20,7 @@ import { ValidationError } from '../ValidationError';
 import { ValidationResult } from '../ValidationResult';
 import { Assertion } from './Assertion';
 import { AssertionLabels } from './AssertionLabels';
+import { CawgTrustConfiguration } from '../ValidationOptions';
 
 /**
  * CAWG Identity Assertion

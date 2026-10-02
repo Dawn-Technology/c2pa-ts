@@ -63,7 +63,7 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
             });
 
             it('decode verifiedIdentities from the ICA credential in the signed JPEG', async function () {
-                if (!manifest) return;
+                if (!manifest) assert.fail('Manifest is not available');
 
                 const buf = await fs.readFile(targetFile).catch(() => undefined);
                 if (!buf) return;
@@ -110,7 +110,7 @@ describe('ICA (identity claims aggregation) Signing Tests', function () {
             });
 
             it('read and verify the JPEG with ICA (identity claims aggregation) assertion', async function () {
-                if (!manifest) return;
+                if (!manifest) assert.fail('Manifest is not available');
 
                 // Load the file into a buffer
                 const buf = await fs.readFile(targetFile).catch(() => undefined);
@@ -245,7 +245,7 @@ describe('Identity Assertion with Multiple Roles', function () {
     });
 
     it('verify identity assertion with multiple roles', async function () {
-        if (!manifest) return;
+        if (!manifest) assert.fail('Manifest is not available');
 
         const buf = await fs.readFile(targetFileMultiRole);
         const asset = await JPEG.create(buf);
@@ -369,7 +369,7 @@ describe('Identity Assertion with Optional Fields', function () {
     });
 
     it('verify identity assertion with optional fields', async function () {
-        if (!manifest) return;
+        if (!manifest) assert.fail('Manifest is not available');
 
         const buf = await fs.readFile(targetFileOptional);
         const asset = await JPEG.create(buf);

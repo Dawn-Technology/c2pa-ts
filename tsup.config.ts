@@ -1,6 +1,7 @@
 import { execSync } from 'node:child_process';
 import { defineConfig } from 'tsup';
 
+
 const gitRevision = execSync('git rev-parse --short HEAD').toString().trim();
 const version = process.env.npm_package_version;
 

@@ -9,7 +9,6 @@ import * as JUMBF from '../jumbf';
 import { Assertion, Claim, Manifest, ValidationResult, ValidationStatusCode } from '../manifest';
 import { IdentityAssertion } from '../manifest/assertions/IdentityAssertion';
 import {
-    CawgTrustConfiguration,
     SignatureType,
     type ExpectedCountersignerMap,
     type HashedUriMap,

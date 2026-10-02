@@ -8,6 +8,7 @@ import * as cborX from 'cbor-x';
 import { Crypto, HashAlgorithm } from '../crypto';
 import { Claim } from '../manifest/Claim';
 import type { C2paAssetBinding, HashedUriMap, HashMap, SignerPayloadMap } from './types.js';
+import { BinaryHelper } from '../util';
 
 /**
  * Serialize claim data using CBOR deterministic encoding
@@ -112,26 +113,32 @@ export function bytesToBase64Url(bytes: Uint8Array): string {
  *
  * @param payload - The signer payload to convert
  * @returns C2PA asset binding in JSON-compatible format
+import { BinaryHelper } from '../util';
+import type { C2paAssetBinding, SignerPayloadMap } from './types.js';
+
+/**
+ * Convert signer_payload to C2PA asset binding format for verifiable credentials
+ * Converts CBOR byte strings to base64
  */
 export function signerPayloadToC2paAssetBinding(payload: SignerPayloadMap): C2paAssetBinding {
     return {
         referenced_assertions: payload.referenced_assertions.map(ra => ({
             url: ra.url,
             ...(ra.alg && { alg: ra.alg }),
-            hash: bytesToBase64(ra.hash),
+            hash: BinaryHelper.bytesToBase64(ra.hash),
         })),
         sig_type: payload.sig_type,
         ...(payload.role && { role: payload.role }),
         ...(payload.expected_partial_claim && {
             expected_partial_claim: {
                 alg: payload.expected_partial_claim.alg,
-                hash: bytesToBase64(payload.expected_partial_claim.hash),
+                hash: BinaryHelper.bytesToBase64(payload.expected_partial_claim.hash),
             },
         }),
         ...(payload.expected_claim_generator && {
             expected_claim_generator: {
                 alg: payload.expected_claim_generator.alg,
-                hash: bytesToBase64(payload.expected_claim_generator.hash),
+                hash: BinaryHelper.bytesToBase64(payload.expected_claim_generator.hash),
             },
         }),
         ...(payload.expected_countersigners && {
@@ -140,7 +147,7 @@ export function signerPayloadToC2paAssetBinding(payload: SignerPayloadMap): C2pa
                 ...(ec.expected_credentials && {
                     expected_credentials: {
                         alg: ec.expected_credentials.alg,
-                        hash: bytesToBase64(ec.expected_credentials.hash),
+                        hash: BinaryHelper.bytesToBase64(ec.expected_credentials.hash),
                     },
                 }),
             })),
@@ -335,18 +342,23 @@ export function deepEqual(a: unknown, b: unknown): boolean {
  *
  * @param data - The data to check
  * @returns True if data is null, undefined, or has length 0
+ * Helper: Check if Uint8Array does not exist or is empty
  */
 export function isEmptyOrMissing(data: Uint8Array | null | undefined): boolean {
     return !data || data.length === 0;
 }
 
 /**
+<<<<<<< HEAD
  * Convert a private JWK to a public JWK
  *
  * Removes private key parameters from a JSON Web Key, leaving only the public key information.
  *
  * @param privateJwk - Private JWK containing private parameters
  * @returns Public JWK with only public parameters
+=======
+ * Convert a private JWK to a public JWK by removing private key parameters
+>>>>>>> feature/cawg-signing-pr
  */
 export function privateJwkToPublicJwk({ kty, crv, x, y, n, e }: JsonWebKey): JsonWebKey {
     return { ...{ kty, crv, x, y, n, e } };

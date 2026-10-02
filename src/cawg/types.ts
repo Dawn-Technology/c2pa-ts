@@ -5,9 +5,6 @@
  * @module cawg/types
  */
 
-import { X509Certificate } from '@peculiar/x509';
-import { ValidationOptions } from '../cose';
-
 /**
  * Hash algorithm and value map used in various CAWG structures
  */
@@ -267,32 +264,6 @@ export enum TrustDecision {
     WellFormed = 'well-formed',
     /** Credential was revoked at the time of signing */
     Revoked = 'revoked',
-}
-
-/**
- * Configuration for CAWG trust model
- */
-export interface CawgTrustConfiguration {
-    /** TODO List of accepted Extended Key Usage (EKU) OID values */
-    // acceptedEkus: string[];
-    /** TODO For each EKU, list of accepted Certificate Policy OID values */
-    // acceptedCertificatePolicies: Map<string, string[]>;
-    /** List of X.509 certificate trust anchors */
-    trustAnchors?: (string | Uint8Array | X509Certificate)[];
-    /** List of trusted identity claims aggregator DIDs */
-    trustedIcaIssuers?: string[];
-    /** Whether to check credential revocation status */
-    checkRevocation?: boolean;
-    /** Current time for validation (defaults to now) */
-    validationTime?: Date;
-}
-
-/**
- * Options for validating an identity assertion
- */
-export interface CawgValidationOptions extends ValidationOptions {
-    /** Trust configuration  */
-    cawg?: CawgTrustConfiguration;
 }
 
 /**

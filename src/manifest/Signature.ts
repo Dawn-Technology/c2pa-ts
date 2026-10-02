@@ -1,4 +1,3 @@
-import { CawgValidationOptions } from '../cawg';
 import * as COSE from '../cose';
 import * as JUMBF from '../jumbf';
 import { TimestampProvider } from '../rfc3161';
@@ -7,6 +6,7 @@ import { Claim } from './Claim';
 import * as raw from './rawTypes';
 import { ManifestComponent, ValidationStatusCode } from './types';
 import { ValidationError } from './ValidationError';
+import { CawgValidationOptions } from './ValidationOptions';
 import { ValidationResult } from './ValidationResult';
 
 export class Signature implements ManifestComponent {

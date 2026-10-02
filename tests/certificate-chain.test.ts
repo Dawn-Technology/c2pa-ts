@@ -584,11 +584,10 @@ describe('Certificate Chain Validation', () => {
                 [intermediateCert],
             );
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(leafKeys.privateKey),
-                leafCert,
-                [intermediateCert, anyCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(leafKeys.privateKey), leafCert, [
+                intermediateCert,
+                anyCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, otherTimestampProvider);
 
@@ -658,11 +657,9 @@ describe('Certificate Chain Validation', () => {
             const [expiredLeafKeys, expiredLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
                 notAfter: new Date(Date.now() - 60000), // expired 60 seconds ago
             });
-            const expiredSigner = new LocalSigner(
-                await toPkcs8Bytes(expiredLeafKeys.privateKey),
-                expiredLeafCert,
-                [intermediateCert],
-            );
+            const expiredSigner = new LocalSigner(await toPkcs8Bytes(expiredLeafKeys.privateKey), expiredLeafCert, [
+                intermediateCert,
+            ]);
 
             // The default timestamp provider uses a separate, currently valid TSA certificate
             const [validationResult, label] = await getValidationResult(expiredSigner, timestampProvider);
@@ -677,7 +674,7 @@ describe('Certificate Chain Validation', () => {
         it('should detect not-yet-valid leaf certificate', async () => {
             const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(intermediateCert, intermediateKeys, {
-                notBefore: new Date(Date.now() + 60_000), // not valid yet
+                notBefore: new Date(Date.now() + 60000), // not valid yet
             });
 
             // Create timestamp provider
@@ -970,11 +967,9 @@ describe('Certificate Chain Validation', () => {
             );
 
             // Create a signer
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [intermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                intermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -1051,11 +1046,10 @@ describe('Certificate Chain Validation', () => {
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(eeCert, eeKeys, {
                 subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Leaf2',
             });
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [eeCert, intermediateCert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                eeCert,
+                intermediateCert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -1068,10 +1062,7 @@ describe('Certificate Chain Validation', () => {
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(eeCert, eeKeys, {
                 subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Leaf2',
             });
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert);
 
             // Trusting an end-entity certificate does not make it a CA
             TrustList.setTrustAnchors([eeCert]);
@@ -1091,11 +1082,10 @@ describe('Certificate Chain Validation', () => {
                 subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Intermediate2',
             });
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(int2Cert, int2Keys);
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [int2Cert, int1Cert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                int2Cert,
+                int1Cert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 
@@ -1112,11 +1102,10 @@ describe('Certificate Chain Validation', () => {
                 subject: 'C=NL, ST=Zuid-Holland, O=Dawn Technology, OU=Development, CN=Intermediate2',
             });
             const [otherLeafKeys, otherLeafCert] = await createLeafCertificate(int2Cert, int2Keys);
-            const otherSigner = new LocalSigner(
-                await toPkcs8Bytes(otherLeafKeys.privateKey),
-                otherLeafCert,
-                [int2Cert, int1Cert],
-            );
+            const otherSigner = new LocalSigner(await toPkcs8Bytes(otherLeafKeys.privateKey), otherLeafCert, [
+                int2Cert,
+                int1Cert,
+            ]);
 
             const [validationResult, label] = await getValidationResult(otherSigner, timestampProvider);
 

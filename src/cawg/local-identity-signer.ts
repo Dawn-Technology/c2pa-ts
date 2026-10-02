@@ -8,9 +8,10 @@
  * @module cawg/local-identity-signer
  */
 import { NamedActorRole, SignatureType, VerifiedIdentity } from '../cawg';
-import { bytesToBase64Url, privateJwkToPublicJwk } from '../cawg/utils';
+import { privateJwkToPublicJwk } from '../cawg/utils';
 import { CoseAlgorithmIdentifier } from '../cose/Algorithms';
 import { Crypto, ECDSASigningAlgorithm, Ed25519SigningAlgorithm, RSASigningAlgorithm } from '../crypto';
+import { BinaryHelper } from '../util';
 import { IdentitySigner } from './identity-signer';
 
 /**
@@ -141,7 +142,7 @@ export class LocalIdentitySigner implements IdentitySigner {
         const privateJwk = await crypto.subtle.exportKey('jwk', privateKey);
         const publicJwk = privateJwkToPublicJwk(privateJwk);
         const canonicalJwk = Object.fromEntries(Object.entries(publicJwk).sort(([a], [b]) => a.localeCompare(b)));
-        const base64 = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(canonicalJwk)));
+        const base64 = BinaryHelper.bytesToBase64Url(new TextEncoder().encode(JSON.stringify(canonicalJwk)));
         return `did:jwk:${base64}`;
     }
 }

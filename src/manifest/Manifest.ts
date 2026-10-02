@@ -1,5 +1,4 @@
 import { Asset } from '../asset';
-import { CawgTrustConfiguration, type CawgValidationOptions } from '../cawg';
 import { Signer } from '../cose';
 import { HashAlgorithm } from '../crypto';
 import { Crypto } from '../crypto/Crypto';
@@ -24,6 +23,7 @@ import {
     ValidationStatusCode,
 } from './types';
 import { ValidationError } from './ValidationError';
+import { CawgTrustConfiguration, CawgValidationOptions } from './ValidationOptions';
 import { ValidationResult } from './ValidationResult';
 
 export class Manifest implements ManifestComponent {

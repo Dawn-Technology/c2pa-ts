@@ -5,6 +5,7 @@ export * from './ManifestStore';
 export * from './Signature';
 export * from './ValidationError';
 export * from './ValidationResult';
+export * from './ValidationOptions';
 export * from './types';
 
 export * from './assertions';

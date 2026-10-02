@@ -2,9 +2,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import { beforeAll, describe, it } from 'bun:test';
 import { Asset, AssetType, JPEG } from '../../src/asset';
-import { CawgValidationOptions } from '../../src/cawg';
 import { SuperBox } from '../../src/jumbf';
-import { ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
+import { CawgValidationOptions, ManifestStore, ValidationError, ValidationResult, ValidationStatusCode } from '../../src/manifest';
 import { BinaryHelper } from '../../src/util';
 import { setTimestampTrustList, setTrustList } from '../utils/set-trust-list';
 

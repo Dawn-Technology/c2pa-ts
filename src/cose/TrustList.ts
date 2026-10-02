@@ -1,6 +1,6 @@
 import { X509Certificate } from '@peculiar/x509';
+import { BinaryHelper } from '../util';
 import { TrustListImportType } from './types';
-import { base64ToBytes } from '../cawg';
 
 export class TrustList {
     private static readonly PEM_CACHE_LIMIT = 8;
@@ -114,7 +114,7 @@ export class TrustList {
         while ((match = pattern.exec(pem)) !== null) {
             const base64 = match[1].replace(/\r?\n|\s/g, '');
             try {
-                out.push(base64ToBytes(base64));
+                out.push(BinaryHelper.base64ToBytes(base64));
             } catch {
                 /* ignore invalid blocks */
             }
