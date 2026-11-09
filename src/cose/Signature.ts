@@ -16,7 +16,6 @@ import { Crypto } from '../crypto';
 import * as JUMBF from '../jumbf';
 import { CBORBox } from '../jumbf';
 import { CawgValidationOptions, ValidationError, ValidationResult, ValidationStatusCode } from '../manifest';
-import { CawgValidationOptions } from '../manifest/ValidationOptions';
 import { Timestamp, TimestampProvider } from '../rfc3161';
 import { BinaryHelper, MalformedContentError } from '../util';
 import { Algorithms, CoseAlgorithm } from './Algorithms';
@@ -203,7 +202,7 @@ export class Signature {
      * @param signer – Signer implementation providing the signature
      * @param payload - Data to be signed
      * @param timestampProvider - Optional provider for RFC3161 timestamp
-     * @throws Error if protected bucket, algorithm or certificate is missing
+     * @throws Error if protected bucket, algorithm or certificate is missing, or if a timestamp provider is given but does not grant a timestamp
      */
     public async sign(
         signer: Signer,
@@ -228,15 +227,17 @@ export class Signature {
                 ).encode(),
             );
             if (
-                timestampResponse?.timeStampToken &&
-                (timestampResponse?.status?.status === pkijs.PKIStatus.granted ||
-                    timestampResponse?.status?.status === pkijs.PKIStatus.grantedWithMods)
-            )
-                this.timestampTokens.push({
-                    version: timestampVersion,
-                    status: timestampResponse.status,
-                    response: timestampResponse.timeStampToken,
-                });
+                !timestampResponse?.timeStampToken ||
+                (timestampResponse.status?.status !== pkijs.PKIStatus.granted &&
+                    timestampResponse.status?.status !== pkijs.PKIStatus.grantedWithMods)
+            ) {
+                throw new Error('Timestamp authority did not grant a timestamp');
+            }
+            this.timestampTokens.push({
+                version: timestampVersion,
+                status: timestampResponse.status,
+                response: timestampResponse.timeStampToken,
+            });
         }
     }
 

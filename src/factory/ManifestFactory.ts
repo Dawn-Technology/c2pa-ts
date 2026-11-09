@@ -2,7 +2,7 @@ import { Asset, createAsset } from '../asset';
 import { LocalSigner } from '../cose';
 import { SuperBox } from '../jumbf';
 import { ClaimVersion, Manifest, ManifestStore } from '../manifest';
-import { LocalTimestampProvider } from '../rfc3161';
+import { TimestampProvider } from '../rfc3161';
 import { DataHashAssertionFactory } from './DataHashAssertionFactory';
 
 export class ManifestFactory {
@@ -47,8 +47,8 @@ export class ManifestFactory {
      * @param manifestStore - The manifest store containing the manifest to sign
      * @param manifest - The manifest to sign
      * @param signer - The LocalSigner used to create the signature
-     * @param timestampProvider - The LocalTimestampProvider used to timestamp the signature
      * @param fileName - The name of the output file containing the signed manifest
+     * @param timestampProvider - Optional RFC 3161 timestamp provider used to timestamp the signature
      * @returns A File containing the modified asset data with the embedded C2PA manifest
      */
     public static async finish(
@@ -57,7 +57,7 @@ export class ManifestFactory {
         manifest: Manifest,
         signer: LocalSigner,
         fileName: string,
-        timestampProvider?: LocalTimestampProvider,
+        timestampProvider?: TimestampProvider,
     ): Promise<File> {
         // Get or create a data hash assertion (hard binding)
         const dataHashAssertion = DataHashAssertionFactory.ensure(manifest);
@@ -84,13 +84,13 @@ export class ManifestFactory {
      * Builds a manifest for the given file, signs it, and embeds it into the file.
      * @param file - The file to which the manifest will be bound
      * @param signer - The LocalSigner used to create the signature
-     * @param timestampProvider - The LocalTimestampProvider used to timestamp the signature
+     * @param timestampProvider - Optional RFC 3161 timestamp provider used to timestamp the signature
      * @returns A File containing the modified asset data with the embedded C2PA manifest
      */
     public static async buildAndFinish(
         file: File,
         signer: LocalSigner,
-        timestampProvider?: LocalTimestampProvider,
+        timestampProvider?: TimestampProvider,
     ): Promise<File> {
         const { asset, manifestStore, manifest } = await this.build(file, signer);
         return this.finish(asset, manifestStore, manifest, signer, file.name, timestampProvider);

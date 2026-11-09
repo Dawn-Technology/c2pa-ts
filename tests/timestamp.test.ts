@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { type X509Certificate } from '@peculiar/x509';
-import { beforeEach, describe, it } from 'bun:test';
+import { afterEach, beforeEach, describe, it } from 'bun:test';
+import { PKIStatus, PKIStatusInfo, TimeStampReq, TimeStampResp } from 'pkijs';
 import { CoseAlgorithmIdentifier, Signer } from '../src/cose';
 import { Signature } from '../src/cose/Signature';
 import { SigStructure } from '../src/cose/SigStructure';
 import { CoseSignature } from '../src/cose/types';
 import { CBORBox } from '../src/jumbf';
 import { ValidationStatusCode } from '../src/manifest';
-import { LocalTimestampProvider } from '../src/rfc3161';
+import { LocalTimestampProvider, TimestampProvider, WebTimestampProvider } from '../src/rfc3161';
 import { loadTestCertificate } from './utils/testCertificates';
 
 describe('Timestamp Tests', () => {
@@ -132,6 +133,71 @@ describe('Timestamp Tests', () => {
 
             assert.ok(result.statusEntries.some(e => e.code === ValidationStatusCode.TimeStampMismatch));
             assert.ok(!result.isValid);
+        });
+    });
+
+    describe('Timestamp Failures', () => {
+        const payload = new Uint8Array([1, 2, 3, 4]);
+        const originalFetch = globalThis.fetch;
+
+        afterEach(() => {
+            globalThis.fetch = originalFetch;
+        });
+
+        it('should throw when the provider returns no response', async () => {
+            const provider: TimestampProvider = { getSignedTimestamp: async () => undefined };
+
+            await assert.rejects(
+                () => signature.sign(localSigner, payload, provider),
+                /Timestamp authority did not grant a timestamp/,
+            );
+        });
+
+        it('should throw when the timestamp authority rejects the request', async () => {
+            const provider: TimestampProvider = {
+                getSignedTimestamp: async () =>
+                    new TimeStampResp({ status: new PKIStatusInfo({ status: PKIStatus.rejection }) }),
+            };
+
+            await assert.rejects(
+                () => signature.sign(localSigner, payload, provider),
+                /Timestamp authority did not grant a timestamp/,
+            );
+        });
+
+        it('should throw when the response is granted but contains no token', async () => {
+            const provider: TimestampProvider = {
+                getSignedTimestamp: async () =>
+                    new TimeStampResp({ status: new PKIStatusInfo({ status: PKIStatus.granted }) }),
+            };
+
+            await assert.rejects(
+                () => signature.sign(localSigner, payload, provider),
+                /Timestamp authority did not grant a timestamp/,
+            );
+        });
+
+        it('should throw when WebTimestampProvider receives an HTTP error', async () => {
+            globalThis.fetch = (async () => new Response('unavailable', { status: 503 })) as unknown as typeof fetch;
+
+            await assert.rejects(
+                () => signature.sign(localSigner, payload, new WebTimestampProvider('https://tsa.example/timestamp')),
+                /Timestamp authority responded with HTTP 503/,
+            );
+        });
+
+        it('should add a timestamp through WebTimestampProvider', async () => {
+            globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+                const request = TimeStampReq.fromBER(init?.body as ArrayBuffer);
+                const response = await mockTimestampProvider.getSignedTimestamp(request);
+                return new Response(response.toSchema().toBER());
+            }) as unknown as typeof fetch;
+
+            await signature.sign(localSigner, payload, new WebTimestampProvider('https://tsa.example/timestamp'));
+
+            const result = await signature.validate(payload);
+            assert.ok(result.statusEntries.some(e => e.code === ValidationStatusCode.TimeStampTrusted));
+            assert.ok(signature.timestamp instanceof Date);
         });
     });
 });

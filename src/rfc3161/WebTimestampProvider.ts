@@ -18,8 +18,10 @@ export class WebTimestampProvider implements TimestampProvider {
             signal: AbortSignal.timeout(this.timeoutMs),
         });
 
-        if (response.ok) {
-            return TimeStampResp.fromBER(await response.arrayBuffer());
+        if (!response.ok) {
+            throw new Error(`Timestamp authority responded with HTTP ${response.status}`);
         }
+
+        return TimeStampResp.fromBER(await response.arrayBuffer());
     }
 }

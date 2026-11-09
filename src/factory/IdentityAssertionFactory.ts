@@ -2,7 +2,7 @@ import { Asset } from '../asset';
 import { IdentityClaimsAggregation, IdentitySigner } from '../cawg';
 import { Signer } from '../cose';
 import { DataHashAssertion, IdentityAssertion, Manifest } from '../manifest';
-import { LocalTimestampProvider } from '../rfc3161';
+import { TimestampProvider } from '../rfc3161';
 import { DataHashAssertionFactory } from './DataHashAssertionFactory';
 
 export class IdentityAssertionFactory {
@@ -14,8 +14,8 @@ export class IdentityAssertionFactory {
      * @param manifest - Manifest being populated and signed
      * @param asset - Asset the manifest is bound to
      * @param signer - Primary C2PA signer used for manifest signing
-     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
      * @param identitySigners - Single identity signer used to produce ICA credential
+     * @param timestampProvider - Optional RFC 3161 timestamp provider for manifest signatures
      * @returns Created hard-binding assertion and identity assertion
      */
     public static async add(
@@ -23,7 +23,7 @@ export class IdentityAssertionFactory {
         asset: Asset,
         signer: Signer,
         identitySigners: IdentitySigner,
-        timestampProvider?: LocalTimestampProvider,
+        timestampProvider?: TimestampProvider,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion }>;
 
     /**
@@ -35,7 +35,7 @@ export class IdentityAssertionFactory {
      * @param asset - Asset the manifest is bound to
      * @param signer - Primary C2PA signer used for manifest signing
      * @param identitySigners - Identity signers used to produce ICA credentials
-     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
+     * @param timestampProvider - Optional RFC 3161 timestamp provider for manifest signatures
      * @returns Created hard-binding assertion and identity assertions
      */
     public static async add(
@@ -43,7 +43,7 @@ export class IdentityAssertionFactory {
         asset: Asset,
         signer: Signer,
         identitySigners: IdentitySigner[],
-        timestampProvider?: LocalTimestampProvider,
+        timestampProvider?: TimestampProvider,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion[] }>;
 
     /**
@@ -60,7 +60,7 @@ export class IdentityAssertionFactory {
      * @param asset - Asset the manifest is bound to
      * @param signer - Primary C2PA signer used for manifest signing
      * @param identitySigners - One or more identity signers
-     * @param timestampProvider - RFC 3161 timestamp provider for manifest signatures
+     * @param timestampProvider - Optional RFC 3161 timestamp provider for manifest signatures
      * @returns Created hard-binding assertion and identity assertion(s)
      */
     public static async add(
@@ -68,7 +68,7 @@ export class IdentityAssertionFactory {
         asset: Asset,
         signer: Signer,
         identitySigners: IdentitySigner | IdentitySigner[],
-        timestampProvider?: LocalTimestampProvider,
+        timestampProvider?: TimestampProvider,
     ): Promise<{ dataHashAssertion: DataHashAssertion; identityAssertion: IdentityAssertion | IdentityAssertion[] }> {
         // Get or create a data hash assertion (hard binding)
         const dataHashAssertion = DataHashAssertionFactory.ensure(manifest);
