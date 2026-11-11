@@ -180,6 +180,28 @@ const fileWithManifest: File = await ManifestFactory.finish(asset, manifestStore
 
 </details>
 
+<details><summary>Creating a manifest with an RFC 3161 timestamp</summary>
+
+```typescript
+import { LocalSigner } from '@dawn-technology/c2pa-ts/cose';
+import { ExampleFactory, ManifestFactory } from '@dawn-technology/c2pa-ts/factory';
+import { WebTimestampProvider } from '@dawn-technology/c2pa-ts/rfc3161';
+
+// Get a file. Replace it with your own file
+const file: File = ExampleFactory.getTestFile();
+
+// Get a signer. Replace it with your own signer
+const signer: LocalSigner = ExampleFactory.getTestSigner();
+
+// Any TimestampProvider works. Replace the URL with your own timestamp authority
+const timestampProvider = new WebTimestampProvider('https://timestamp.example.com');
+
+// Apply C2PA on a file and return the new file. Signing throws if the timestamp authority does not grant a timestamp
+const fileWithManifest: File = await ManifestFactory.buildAndFinish(file, signer, timestampProvider);
+```
+
+</details>
+
 <details><summary>Reading and validating a manifest in a Node.js environment</summary>
 
 ```typescript

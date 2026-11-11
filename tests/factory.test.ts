@@ -18,7 +18,10 @@ import {
     IngredientAssertion,
     ThumbnailAssertion,
     ThumbnailType,
+    ValidationStatusCode,
 } from '../src/manifest';
+import { TimestampProvider } from '../src/rfc3161';
+import { loadTestCertificate, TEST_CERTIFICATES } from './utils/testCertificates';
 
 describe('Factory tests', () => {
     it('Validating a file', async () => {
@@ -145,5 +148,78 @@ describe('Factory tests', () => {
             manifest.assertions?.assertions.find((assertion: Assertion) => assertion instanceof IdentityAssertion),
             'Manifest should contain an identity assertion',
         );
+    });
+
+    describe('with a custom timestamp provider', () => {
+        const customProvider = (provider: TimestampProvider): TimestampProvider => ({
+            getSignedTimestamp: request => provider.getSignedTimestamp(request),
+        });
+
+        it('Creating a manifest with a timestamp', async () => {
+            const file: File = ExampleFactory.getTestFile();
+            const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
+            assert(signer instanceof LocalSigner);
+
+            const { manifestStore, manifest, asset } = await ManifestFactory.build(file, signer);
+            const fileWithManifest: File = await ManifestFactory.finish(
+                asset,
+                manifestStore,
+                manifest,
+                signer,
+                file.name,
+                customProvider(timestampProvider),
+            );
+
+            const { manifestStore: signedStore, validationResult } = await ValidationFactory.validate(fileWithManifest);
+            assert(signedStore, 'Signed file should contain a manifest store');
+            assert(
+                signedStore.getActiveManifest()?.signature?.signatureData.timestamp instanceof Date,
+                'Active manifest should carry a timestamp',
+            );
+            assert(validationResult);
+            assert(
+                [...validationResult.values()].every(result =>
+                    result.statusEntries.some(entry => entry.code === ValidationStatusCode.TimeStampTrusted),
+                ),
+            );
+        });
+
+        it('Creating a manifest with an identity assertion and a timestamp', async () => {
+            const file: File = ExampleFactory.getTestFile();
+            const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
+            assert(signer instanceof LocalSigner);
+            const identitySigner: LocalIdentitySigner = ExampleFactory.getTestIdentitySigner();
+            const provider = customProvider(timestampProvider);
+
+            const { manifestStore, manifest, asset } = await ManifestFactory.build(file, signer);
+            await IdentityAssertionFactory.add(manifest, asset, signer, identitySigner, provider);
+            const fileWithManifest: File = await ManifestFactory.finish(
+                asset,
+                manifestStore,
+                manifest,
+                signer,
+                file.name,
+                provider,
+            );
+
+            const { manifestStore: signedStore } = await ValidationFactory.validate(fileWithManifest);
+            assert(signedStore?.getActiveManifest()?.signature?.signatureData.timestamp instanceof Date);
+            assert(signedStore.getActiveManifest()?.assertions?.getIdentityAssertions().length === 1);
+        });
+
+        it('Creating a manifest with buildAndFinish and a timestamp', async () => {
+            const file: File = ExampleFactory.getTestFile();
+            const { signer, timestampProvider } = await loadTestCertificate(TEST_CERTIFICATES[0]);
+            assert(signer instanceof LocalSigner);
+
+            const fileWithManifest = await ManifestFactory.buildAndFinish(
+                file,
+                signer,
+                customProvider(timestampProvider),
+            );
+
+            const { manifestStore } = await ValidationFactory.validate(fileWithManifest);
+            assert(manifestStore?.getActiveManifest()?.signature?.signatureData.timestamp instanceof Date);
+        });
     });
 });
