@@ -1,5 +1,11 @@
 # c2pa-ts
 
+## 0.18.0
+
+### Minor Changes
+
+- 673bcee: Timestamp bugfix
+
 ## 0.17.2
 
 ### Patch Changes
